@@ -1,4 +1,4 @@
-# DUPLICATE-X: Intelligent Multi-Device File Deduplication & Storage Optimization System
+git --version# DUPLICATE-X: Intelligent Multi-Device File Deduplication & Storage Optimization System
 ### Developed by Team DataVault | Academic Year 2026–2027
 
 ---
@@ -150,5 +150,3 @@ A standardized Windows CI workflow is provided at `.github/workflows/windows-tes
 | **Part 4: Duplicate Detection Engine** | Completed | 10-step grouping pipeline, cryptographic collision branch isolation. |
 | **Part 4 Verification Test Suite** | Compiled (CI Configured) | All 12 scenarios implemented in `test_duplicate_detector.c`; local runtime pending due to Windows SAC; automated Windows CI workflow configured. |
 
-#   D a t a V a u l t - D U P L I C A T E - X  
- 

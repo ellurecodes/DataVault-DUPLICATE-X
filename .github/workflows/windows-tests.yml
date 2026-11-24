@@ -42,6 +42,7 @@ jobs:
             backend/src/core/duplicate_detector.c \
             backend/src/ds/hashtable.c \
             backend/src/ds/duplicate_group.c \
+            backend/src/ds/minheap.c \
             backend/src/platform/windows/win_file_scanner.c \
             backend/src/platform/windows/win_crypto.c \
             backend/src/platform/windows/win_file_compare.c \
@@ -59,6 +60,7 @@ jobs:
             backend/src/core/file_scanner.c \
             backend/src/ds/hashtable.c \
             backend/src/ds/duplicate_group.c \
+            backend/src/ds/minheap.c \
             backend/src/platform/windows/win_file_scanner.c \
             backend/src/platform/windows/win_crypto.c \
             backend/src/platform/windows/win_file_compare.c \
@@ -70,6 +72,22 @@ jobs:
         shell: msys2 {0}
         run: |
           ./backend/build/test_duplicate_detector.exe
+
+      - name: Compile Part 5A Binary Min Heap Test Suite
+        shell: msys2 {0}
+        run: |
+          gcc -std=c11 -Wall -Wextra -Wpedantic \
+            -Ibackend/include \
+            backend/tests/test_minheap.c \
+            backend/src/ds/minheap.c \
+            backend/src/ds/duplicate_group.c \
+            -o backend/build/test_minheap.exe
+          ls -l backend/build/test_minheap.exe
+
+      - name: Execute Part 5A 15-Scenario Min Heap Test Suite
+        shell: msys2 {0}
+        run: |
+          ./backend/build/test_minheap.exe
 
       - name: Smoke Test Main CLI
         shell: msys2 {0}

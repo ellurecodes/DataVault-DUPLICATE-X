@@ -7,6 +7,7 @@
 #include "duplicate_detector.h"
 #include "hashtable.h"
 #include "file_compare.h"
+#include "minheap.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -197,6 +198,61 @@ void duplicate_report_print(const DuplicateGroupList *groups,
     printf("Total Duplicate Files: %zu\n", groups ? groups->total_duplicate_copies : 0);
     printf("Recoverable Storage:  %llu bytes (%.2f KB, %.2f MB)\n",
            (unsigned long long)(groups ? groups->total_recoverable_bytes : 0), kb, mb);
-    printf("=========================================\n");
+    printf("=========================================\n\n");
 }
+
+void duplicate_report_print_top_k(const DuplicateGroupList *groups, size_t k) {
+    printf("====================================================\n");
+    printf(" DUPLICATE-X: TOP %zu STORAGE RECOVERY OPPORTUNITIES\n", k);
+    printf(" Powered by Custom Binary Min Heap Ranking Engine\n");
+    printf("====================================================\n\n");
+
+    if (!groups || groups->total_groups == 0 || k == 0) {
+        printf("No duplicate groups available for ranking.\n\n");
+        return;
+    }
+
+    /* Allocate pointer buffer for up to k groups */
+    const DuplicateGroup **top_k = (const DuplicateGroup **)malloc(k * sizeof(const DuplicateGroup *));
+    if (!top_k) {
+        printf("[ERROR] Failed to allocate Top K results buffer.\n\n");
+        return;
+    }
+
+    size_t actual_count = 0;
+    StatusCode sc = minheap_get_top_k(groups, k, top_k, &actual_count);
+    if (sc != STATUS_SUCCESS || actual_count == 0) {
+        printf("No duplicate groups ranked.\n\n");
+        free(top_k);
+        return;
+    }
+
+    printf("Rank | Group ID | Copies | File Size (Bytes) | Recoverable Storage\n");
+    printf("-----+----------+--------+-------------------+--------------------\n");
+
+    for (size_t i = 0; i < actual_count; i++) {
+        const DuplicateGroup *g = top_k[i];
+        char rec_str[64];
+        duplicate_detector_format_size(g->recoverable_bytes, rec_str, sizeof(rec_str));
+
+        printf("#%-3zu | Group %-2u | %-6u | %17llu | %s\n",
+               i + 1,
+               g->group_id,
+               g->file_count,
+               (unsigned long long)g->file_size,
+               rec_str);
+    }
+    printf("--------------------------------------------------------------------\n");
+    if (actual_count < k) {
+        printf("(Showing all %zu available duplicate group(s) since total < %zu)\n", actual_count, k);
+    }
+
+    char total_rec_str[64];
+    duplicate_detector_format_size(groups->total_recoverable_bytes, total_rec_str, sizeof(total_rec_str));
+    printf("Aggregate Recoverable Across All Groups: %s\n", total_rec_str);
+    printf("====================================================================\n\n");
+
+    free(top_k);
+}
+
 

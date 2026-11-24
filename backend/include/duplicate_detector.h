@@ -45,5 +45,13 @@ void duplicate_report_print(const DuplicateGroupList *groups,
                             size_t total_scanned,
                             size_t total_hashed);
 
+/**
+ * @brief Display the Top K largest storage-wasting duplicate groups using Binary Min Heap.
+ * 
+ * @param groups Pointer to DuplicateGroupList.
+ * @param k Number of top groups to display (e.g. 5).
+ */
+void duplicate_report_print_top_k(const DuplicateGroupList *groups, size_t k);
+
 #endif /* DATAVAULT_DUPLICATE_DETECTOR_H */
 

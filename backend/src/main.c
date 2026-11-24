@@ -109,7 +109,10 @@ int wmain(int argc, wchar_t *argv[]) {
     /* Step 9: Render the official Duplicate Detection Report */
     duplicate_report_print(&duplicate_groups, inventory.count, successfully_hashed);
 
-    /* Step 10: Safe cleanup and shutdown */
+    /* Step 10: Display Top K storage recovery opportunities via Binary Min Heap (K = 5) */
+    duplicate_report_print_top_k(&duplicate_groups, 5);
+
+    /* Step 11: Safe cleanup and shutdown */
     duplicate_group_list_free(&duplicate_groups);
     file_inventory_free(&inventory);
     engine_shutdown(&engine);

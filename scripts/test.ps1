@@ -51,6 +51,7 @@ $TestSources = @(
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/core/file_scanner.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/hashtable.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/duplicate_group.c"),
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/minheap.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/platform/windows/win_file_scanner.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/platform/windows/win_crypto.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/platform/windows/win_file_compare.c")
@@ -68,11 +69,30 @@ if ($compileExit -ne 0 -or -not (Test-Path $TestExe)) {
 Write-Host "[SUCCESS] Test binary compiled: $TestExe" -ForegroundColor Green
 Write-Host "`n[INFO] Launching Part 4 verification test executable...`n" -ForegroundColor Cyan
 
-# 5. Execute test binary and capture runtime exit code
+# 5. Compile and execute Part 5A Binary Min Heap test suite
+$MinHeapTestExe     = [System.IO.Path]::GetFullPath("$OutputDir/test_minheap.exe")
+$MinHeapTestSources = @(
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/tests/test_minheap.c"),
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/minheap.c"),
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/duplicate_group.c")
+)
+
+Write-Host "`n[INFO] Compiling Part 5A Binary Min Heap test suite..." -ForegroundColor Cyan
+& "$GccPath" -std=c11 -Wall -Wextra -Wpedantic "-I$IncludeDir" $MinHeapTestSources -o "$MinHeapTestExe"
+$mhCompileExit = $LASTEXITCODE
+
+if ($mhCompileExit -ne 0 -or -not (Test-Path $MinHeapTestExe)) {
+    Write-Host "[ERROR] MinHeap test compilation failed with exit code $mhCompileExit." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "[SUCCESS] MinHeap test binary compiled: $MinHeapTestExe" -ForegroundColor Green
+
+# 6. Execute test binaries and capture runtime exit codes
+Write-Host "`n[INFO] Launching Part 4 verification test executable...`n" -ForegroundColor Cyan
 $testProcess = Start-Process -FilePath "$TestExe" -Wait -NoNewWindow -PassThru -ErrorAction SilentlyContinue
 
 if ($null -eq $testProcess) {
-    # Fallback to direct call operator in case Start-Process encounters environment restrictions
     try {
         & "$TestExe"
         $testExit = $LASTEXITCODE
@@ -86,9 +106,30 @@ if ($null -eq $testProcess) {
 }
 
 if ($testExit -ne 0) {
-    Write-Host "`n[FAILURE] Test suite failed with exit code $testExit." -ForegroundColor Red
+    Write-Host "`n[FAILURE] Part 4 test suite failed with exit code $testExit." -ForegroundColor Red
     exit $testExit
 }
 
-Write-Host "`n[SUCCESS] All test suite assertions passed successfully (exit code $testExit)." -ForegroundColor Green
+Write-Host "`n[INFO] Launching Part 5A Binary Min Heap test executable...`n" -ForegroundColor Cyan
+$mhProcess = Start-Process -FilePath "$MinHeapTestExe" -Wait -NoNewWindow -PassThru -ErrorAction SilentlyContinue
+
+if ($null -eq $mhProcess) {
+    try {
+        & "$MinHeapTestExe"
+        $mhExit = $LASTEXITCODE
+    } catch {
+        Write-Host "`n[ERROR] Failed to execute MinHeap test binary: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[BLOCKED] Execution blocked by host operating system security." -ForegroundColor Yellow
+        exit 126
+    }
+} else {
+    $mhExit = $mhProcess.ExitCode
+}
+
+if ($mhExit -ne 0) {
+    Write-Host "`n[FAILURE] Part 5A MinHeap test suite failed with exit code $mhExit." -ForegroundColor Red
+    exit $mhExit
+}
+
+Write-Host "`n[SUCCESS] All test suite assertions passed successfully (exit code 0)." -ForegroundColor Green
 exit 0
