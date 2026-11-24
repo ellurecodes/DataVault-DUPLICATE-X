@@ -146,13 +146,13 @@
                 <span class="tag tag-cyan">Read-Only Safe Mode</span>
             </div>
 
-            <div class="dir-input-container">
+            <div class="dir-input-container" id="dirDropZone">
                 <div class="input-with-button">
                     <div class="input-icon-wrapper">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                         </svg>
-                        <input type="text" id="dirInput" class="form-input" placeholder="Enter absolute directory path, e.g. C:\Users\User\Documents">
+                        <input type="text" id="dirInput" class="form-input" placeholder="Enter path (e.g. C:\Users\... or data/test_files/device_laptop), browse, or drop folder here">
                     </div>
                     <button id="btnAddDir" class="btn btn-secondary">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -161,6 +161,22 @@
                         </svg>
                         Add Directory
                     </button>
+                    <button type="button" id="btnBrowseFolder" class="btn btn-secondary" title="Browse and select a folder">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        Browse Folder...
+                    </button>
+                    <input type="file" id="folderPickerInput" webkitdirectory directory multiple style="display: none;">
+                </div>
+
+                <!-- Quick Sample Folders Bar -->
+                <div class="quick-samples-bar">
+                    <span class="quick-samples-label">Quick Test Folders:</span>
+                    <button type="button" class="btn-sample-dir" data-path="data/test_files/device_laptop" title="Add Sample Laptop folder for cross-device comparison">+ Sample Laptop</button>
+                    <button type="button" class="btn-sample-dir" data-path="data/test_files/device_usb" title="Add Sample USB folder for cross-device comparison">+ Sample USB</button>
+                    <button type="button" class="btn-sample-dir" data-path="data/test_fixtures_p4/dirA" title="Add Test Fixture A">+ Fixture A</button>
+                    <button type="button" class="btn-sample-dir" data-path="data/test_fixtures_p4/dirB" title="Add Test Fixture B">+ Fixture B</button>
                 </div>
             </div>
 

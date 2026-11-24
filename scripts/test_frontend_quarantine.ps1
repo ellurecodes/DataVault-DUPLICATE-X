@@ -143,3 +143,4 @@ Assert-Check 20 "app.js enforces 2-stage restore & destination conflict handling
 Write-Host "`n====================================================" -ForegroundColor Green
 Write-Host " ALL $Passed/$Total FRONTEND INTEGRATION CHECKS PASSED (100%)! " -ForegroundColor Green
 Write-Host "====================================================`n" -ForegroundColor Green
+

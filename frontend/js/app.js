@@ -421,20 +421,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Clean and normalize a directory path string
+     */
+    function cleanDirectoryPath(dirPath) {
+        if (!dirPath) return '';
+        let cleaned = dirPath.trim();
+        // Remove surrounding single or double quotes
+        while ((cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+               (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+            cleaned = cleaned.substring(1, cleaned.length - 1).trim();
+        }
+        // Normalize multiple forward/back slashes
+        // If it's not a root drive like C:\ or /, strip trailing slashes
+        if (cleaned.length > 3 && (cleaned.endsWith('\\') || cleaned.endsWith('/'))) {
+            cleaned = cleaned.replace(/[\\/]+$/, '');
+        }
+        return cleaned;
+    }
+
+    /**
      * Add directory to queue
      */
     function addDirectory(dirPath) {
         if (!dirPath) return;
-        const trimmed = dirPath.trim();
-        if (!trimmed) return;
+        // Support multiple paths separated by newlines or semicolons or commas
+        const rawPaths = dirPath.split(/[\r\n,;]+/);
+        let addedCount = 0;
 
-        // Prevent duplicate directory entries
-        if (!state.directories.includes(trimmed)) {
-            state.directories.push(trimmed);
-            DashboardUI.renderConfiguredDirs(state.directories, removeDirectory);
+        for (const raw of rawPaths) {
+            const cleaned = cleanDirectoryPath(raw);
+            if (!cleaned) continue;
+
+            // Prevent duplicate directory entries
+            if (!state.directories.includes(cleaned)) {
+                state.directories.push(cleaned);
+                addedCount++;
+            }
         }
-        elements.dirInput.value = '';
-        elements.dirInput.focus();
+
+        if (addedCount > 0) {
+            DashboardUI.renderConfiguredDirs(state.directories, removeDirectory);
+            DashboardUI.showToast('Directory Queued', `Added ${addedCount} folder(s) to target comparison queue.`, 'info');
+        } else if (rawPaths.length === 1 && state.directories.includes(cleanDirectoryPath(dirPath))) {
+            DashboardUI.showToast('Already Queued', 'This directory is already in your target comparison queue.', 'warning');
+        }
+
+        if (elements.dirInput) {
+            elements.dirInput.value = '';
+            elements.dirInput.focus();
+        }
     }
 
     /**
@@ -538,6 +573,100 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 addDirectory(elements.dirInput.value);
+            }
+        });
+    }
+
+    // Folder Picker Dialog
+    const btnBrowseFolder = document.getElementById('btnBrowseFolder');
+    const folderPickerInput = document.getElementById('folderPickerInput');
+
+    if (btnBrowseFolder && folderPickerInput) {
+        btnBrowseFolder.addEventListener('click', () => {
+            folderPickerInput.value = '';
+            folderPickerInput.click();
+        });
+
+        folderPickerInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+
+            const firstFile = files[0];
+            let folderPath = firstFile.path;
+
+            if (folderPath) {
+                const relPath = firstFile.webkitRelativePath || '';
+                const parts = relPath.split('/');
+                if (parts.length > 1) {
+                    const rootName = parts[0];
+                    const idx = folderPath.lastIndexOf(rootName);
+                    if (idx !== -1) {
+                        folderPath = folderPath.substring(0, idx + rootName.length);
+                    }
+                }
+                addDirectory(folderPath);
+            } else if (firstFile.webkitRelativePath) {
+                const rootName = firstFile.webkitRelativePath.split('/')[0];
+                const defaultPath = rootName.startsWith('device_') ? `data/test_files/${rootName}` : rootName;
+                const userPath = prompt(
+                    `Folder "${rootName}" selected!\n\nDue to web browser sandbox restrictions, please confirm the local directory path:`,
+                    defaultPath
+                );
+                if (userPath) {
+                    addDirectory(userPath);
+                }
+            }
+        });
+    }
+
+    // Quick Sample Buttons
+    document.querySelectorAll('.btn-sample-dir').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const path = btn.getAttribute('data-path');
+            if (path) {
+                addDirectory(path);
+            }
+        });
+    });
+
+    // Drag and Drop onto Target Directories Zone
+    const dropZone = document.getElementById('dirDropZone') || document.querySelector('.dir-input-container');
+    if (dropZone) {
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('drag-over');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('drag-over');
+            });
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (!dt) return;
+
+            const textData = dt.getData('text/plain');
+            if (textData) {
+                addDirectory(textData);
+                return;
+            }
+
+            if (dt.files && dt.files.length > 0) {
+                for (let i = 0; i < dt.files.length; i++) {
+                    const f = dt.files[i];
+                    if (f.path) {
+                        addDirectory(f.path);
+                    } else if (f.name) {
+                        addDirectory(`data/test_files/${f.name}`);
+                    }
+                }
             }
         });
     }

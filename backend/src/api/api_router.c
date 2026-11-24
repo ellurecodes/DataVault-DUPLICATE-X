@@ -128,8 +128,17 @@ static bool parse_json_directories(const char *json, char dirs[32][1024], size_t
 
             if (*p == '\"') p++; /* Skip closing quote */
 
-            if (count < 32 && strlen(val) > 0) {
-                strncpy(dirs[count], val, sizeof(dirs[count]) - 1);
+            /* Strip leading and trailing quotes and whitespace */
+            char *s = val;
+            while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n' || *s == '\"' || *s == '\'') s++;
+            size_t vlen = strlen(s);
+            while (vlen > 0 && (s[vlen - 1] == ' ' || s[vlen - 1] == '\t' || s[vlen - 1] == '\r' || s[vlen - 1] == '\n' || s[vlen - 1] == '\"' || s[vlen - 1] == '\'')) {
+                s[vlen - 1] = '\0';
+                vlen--;
+            }
+
+            if (count < 32 && vlen > 0) {
+                strncpy(dirs[count], s, sizeof(dirs[count]) - 1);
                 dirs[count][sizeof(dirs[count]) - 1] = '\0';
                 count++;
             }
@@ -565,6 +574,17 @@ static void handle_scan(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiRes
         }
         wide_dirs[i] = (wchar_t *)malloc(wlen * sizeof(wchar_t));
         MultiByteToWideChar(CP_UTF8, 0, dirs_utf8[i], -1, wide_dirs[i], wlen);
+
+        /* If path does not exist directly, try ../<path> fallback (for when running from build directory) */
+        DWORD attr = GetFileAttributesW(wide_dirs[i]);
+        if (attr == INVALID_FILE_ATTRIBUTES) {
+            wchar_t fallback[MAX_PATH * 2];
+            swprintf(fallback, sizeof(fallback) / sizeof(wchar_t), L"../%ls", wide_dirs[i]);
+            if (GetFileAttributesW(fallback) != INVALID_FILE_ATTRIBUTES) {
+                free(wide_dirs[i]);
+                wide_dirs[i] = _wcsdup(fallback);
+            }
+        }
     }
 
     /* Clean up any existing scan session in context before running new scan */
@@ -589,7 +609,9 @@ static void handle_scan(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiRes
 
     if (sc != STATUS_SUCCESS && ctx->inventory.count == 0) {
         snprintf(ctx->last_scan_status, sizeof(ctx->last_scan_status), "SCAN_FAILED");
-        api_build_error_response(resp, 500, "Filesystem scan failed for all specified directories.", req->origin);
+        char err_msg[1280];
+        snprintf(err_msg, sizeof(err_msg), "Filesystem scan failed for all specified directories. Please verify directory exists: '%.512s'", dirs_utf8[0]);
+        api_build_error_response(resp, 500, err_msg, req->origin);
         return;
     }
 

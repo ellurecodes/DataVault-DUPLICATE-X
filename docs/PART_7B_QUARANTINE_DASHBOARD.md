@@ -337,3 +337,4 @@ To manually verify the end-to-end integration:
 
 ### Q15: Why is the frontend built with Vanilla JavaScript instead of frameworks like React, Vue, or Angular?
 **Answer:** The C backend embeds a lightweight, non-blocking HTTP server (Winsock2). Serving a zero-dependency Vanilla JS, HTML5, and CSS3 frontend eliminates the need for Node.js runtimes, package managers, bundlers (Webpack/Vite), and heavy client-side virtual DOM overhead. The entire application runs out-of-the-box as a single compiled executable with instantaneous asset delivery.
+
