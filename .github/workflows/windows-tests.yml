@@ -43,6 +43,7 @@ jobs:
             backend/src/ds/hashtable.c \
             backend/src/ds/duplicate_group.c \
             backend/src/ds/minheap.c \
+            backend/src/ds/trie.c \
             backend/src/platform/windows/win_file_scanner.c \
             backend/src/platform/windows/win_crypto.c \
             backend/src/platform/windows/win_file_compare.c \
@@ -88,6 +89,21 @@ jobs:
         shell: msys2 {0}
         run: |
           ./backend/build/test_minheap.exe
+
+      - name: Compile Part 5B Prefix Trie Test Suite
+        shell: msys2 {0}
+        run: |
+          gcc -std=c11 -Wall -Wextra -Wpedantic \
+            -Ibackend/include \
+            backend/tests/test_trie.c \
+            backend/src/ds/trie.c \
+            -o backend/build/test_trie.exe
+          ls -l backend/build/test_trie.exe
+
+      - name: Execute Part 5B 18-Scenario Trie Test Suite
+        shell: msys2 {0}
+        run: |
+          ./backend/build/test_trie.exe
 
       - name: Smoke Test Main CLI
         shell: msys2 {0}

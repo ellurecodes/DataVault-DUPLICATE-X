@@ -106,3 +106,4 @@ flowchart TD
 
 **Q3: Does the MinHeap own the DuplicateGroup memory?**  
 *Answer:* No. The MinHeap stores non-owning `const DuplicateGroup *` pointers. The heap allocation and cleanup routines only manage the heap structure and its internal pointer array. The actual `DuplicateGroup` objects remain owned by `DuplicateGroupList` and are freed by `duplicate_group_list_free()`.
+

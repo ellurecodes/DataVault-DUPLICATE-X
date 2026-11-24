@@ -88,7 +88,25 @@ if ($mhCompileExit -ne 0 -or -not (Test-Path $MinHeapTestExe)) {
 
 Write-Host "[SUCCESS] MinHeap test binary compiled: $MinHeapTestExe" -ForegroundColor Green
 
-# 6. Execute test binaries and capture runtime exit codes
+# 6. Compile Part 5B Prefix Trie test suite
+$TrieTestExe     = [System.IO.Path]::GetFullPath("$OutputDir/test_trie.exe")
+$TrieTestSources = @(
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/tests/test_trie.c"),
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/trie.c")
+)
+
+Write-Host "`n[INFO] Compiling Part 5B Prefix Trie test suite..." -ForegroundColor Cyan
+& "$GccPath" -std=c11 -Wall -Wextra -Wpedantic "-I$IncludeDir" $TrieTestSources -o "$TrieTestExe"
+$trieCompileExit = $LASTEXITCODE
+
+if ($trieCompileExit -ne 0 -or -not (Test-Path $TrieTestExe)) {
+    Write-Host "[ERROR] Trie test compilation failed with exit code $trieCompileExit." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "[SUCCESS] Trie test binary compiled: $TrieTestExe" -ForegroundColor Green
+
+# 7. Execute test binaries and capture runtime exit codes
 Write-Host "`n[INFO] Launching Part 4 verification test executable...`n" -ForegroundColor Cyan
 $testProcess = Start-Process -FilePath "$TestExe" -Wait -NoNewWindow -PassThru -ErrorAction SilentlyContinue
 
@@ -129,6 +147,27 @@ if ($null -eq $mhProcess) {
 if ($mhExit -ne 0) {
     Write-Host "`n[FAILURE] Part 5A MinHeap test suite failed with exit code $mhExit." -ForegroundColor Red
     exit $mhExit
+}
+
+Write-Host "`n[INFO] Launching Part 5B Prefix Trie test executable...`n" -ForegroundColor Cyan
+$trieProcess = Start-Process -FilePath "$TrieTestExe" -Wait -NoNewWindow -PassThru -ErrorAction SilentlyContinue
+
+if ($null -eq $trieProcess) {
+    try {
+        & "$TrieTestExe"
+        $trieExit = $LASTEXITCODE
+    } catch {
+        Write-Host "`n[ERROR] Failed to execute Trie test binary: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[BLOCKED] Execution blocked by host operating system security." -ForegroundColor Yellow
+        exit 126
+    }
+} else {
+    $trieExit = $trieProcess.ExitCode
+}
+
+if ($trieExit -ne 0) {
+    Write-Host "`n[FAILURE] Part 5B Trie test suite failed with exit code $trieExit." -ForegroundColor Red
+    exit $trieExit
 }
 
 Write-Host "`n[SUCCESS] All test suite assertions passed successfully (exit code 0)." -ForegroundColor Green

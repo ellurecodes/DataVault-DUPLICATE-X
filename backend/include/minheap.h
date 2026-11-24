@@ -141,3 +141,4 @@ StatusCode minheap_get_top_k(const DuplicateGroupList *list,
 #endif
 
 #endif /* DATAVAULT_MINHEAP_H */
+

@@ -8,10 +8,12 @@
 #include "file_scanner.h"
 #include "sha256.h"
 #include "duplicate_detector.h"
+#include "trie.h"
 #include "status.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h>
+#include <windows.h>
 
 int wmain(int argc, wchar_t *argv[]) {
     /* Step 1: Render project and team identity banner */
@@ -26,23 +28,49 @@ int wmain(int argc, wchar_t *argv[]) {
         return EXIT_FAILURE;
     }
 
-    /* Step 3: Validate command-line arguments */
-    if (argc < 2) {
+    /* Step 3: Parse command-line arguments (--prefix optional flag) */
+    const wchar_t *query_prefix_w = NULL;
+
+    for (int i = 1; i < argc; i++) {
+        if (wcscmp(argv[i], L"--prefix") == 0) {
+            if (i + 1 < argc) {
+                query_prefix_w = argv[i + 1];
+                i++; /* skip prefix argument value */
+            }
+        }
+    }
+
+    /* Collect target directory arguments (excluding --prefix and its argument) */
+    const wchar_t *selected_dirs[64];
+    size_t num_dirs = 0;
+
+    for (int i = 1; i < argc; i++) {
+        if (wcscmp(argv[i], L"--prefix") == 0) {
+            i++; /* skip flag value */
+            continue;
+        }
+        if (num_dirs < 64) {
+            selected_dirs[num_dirs++] = argv[i];
+        }
+    }
+
+    if (num_dirs == 0) {
         printf("\n[USAGE]\n");
-        printf("  duplicate-x.exe <directory1> [directory2] ...\n\n");
-        printf("[EXAMPLE]\n");
-        printf("  duplicate-x.exe \"C:\\Users\\User\\Documents\" \"D:\\Backup\"\n\n");
+        printf("  duplicate-x.exe [--prefix <path_prefix>] <directory1> [directory2] ...\n\n");
+        printf("[EXAMPLES]\n");
+        printf("  duplicate-x.exe \"C:\\Users\\User\\Documents\" \"D:\\Backup\"\n");
+        printf("  duplicate-x.exe --prefix \"C:\\Users\\User\\Documents\\Notes\" \"C:\\Users\\User\\Documents\"\n\n");
         printf("[NOTE] DUPLICATE-X will only scan directories explicitly provided above.\n");
         engine_shutdown(&engine);
         return EXIT_SUCCESS;
     }
 
-    size_t num_dirs = (size_t)(argc - 1);
-    const wchar_t **selected_dirs = (const wchar_t **)&argv[1];
-
     printf("\n[CONFIGURED STORAGE LOCATIONS]\n");
     for (size_t i = 0; i < num_dirs; i++) {
         wprintf(L"  [%zu] %ls\n", i + 1, selected_dirs[i]);
+    }
+    if (query_prefix_w) {
+        wprintf(L"  [PREFIX FILTER] %ls\n", query_prefix_w);
     }
     printf("\n");
 
@@ -112,7 +140,30 @@ int wmain(int argc, wchar_t *argv[]) {
     /* Step 10: Display Top K storage recovery opportunities via Binary Min Heap (K = 5) */
     duplicate_report_print_top_k(&duplicate_groups, 5);
 
-    /* Step 11: Safe cleanup and shutdown */
+    /* Step 11: Build Custom Prefix Trie and execute prefix search if requested */
+    Trie *trie = trie_init();
+    if (trie) {
+        for (size_t i = 0; i < inventory.count; i++) {
+            const FileRecord *rec = &inventory.records[i];
+            if (rec->filepath) {
+                trie_insert(trie, rec->filepath, rec);
+            }
+        }
+
+        if (query_prefix_w) {
+            char query_prefix_utf8[4096];
+            WideCharToMultiByte(CP_UTF8, 0, query_prefix_w, -1, query_prefix_utf8, sizeof(query_prefix_utf8), NULL, NULL);
+
+            TrieSearchResults search_results;
+            trie_search_prefix(trie, query_prefix_utf8, &search_results);
+            trie_print_matches(&search_results, query_prefix_utf8);
+            trie_search_results_free(&search_results);
+        }
+
+        trie_free(trie);
+    }
+
+    /* Step 12: Safe cleanup and shutdown */
     duplicate_group_list_free(&duplicate_groups);
     file_inventory_free(&inventory);
     engine_shutdown(&engine);
