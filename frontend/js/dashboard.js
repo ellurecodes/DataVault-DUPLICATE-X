@@ -65,20 +65,86 @@ const DashboardUI = {
     },
 
     /**
-     * Render the 4 summary telemetry cards
+     * Display loading state on the 4 telemetry metric cards while fetching API stats
+     */
+    renderMetricsLoading() {
+        const totalFiles = document.getElementById('metricTotalFiles');
+        const hashedFiles = document.getElementById('metricHashedFiles');
+        const dupGroups = document.getElementById('metricDuplicateGroups');
+        const recStorage = document.getElementById('metricRecoverableStorage');
+
+        if (totalFiles) totalFiles.innerHTML = '<span class="metric-loading">...</span>';
+        if (hashedFiles) hashedFiles.innerHTML = '<span class="metric-loading">...</span>';
+        if (dupGroups) dupGroups.innerHTML = '<span class="metric-loading">...</span>';
+        if (recStorage) recStorage.innerHTML = '<span class="metric-loading">...</span>';
+    },
+
+    /**
+     * Display meaningful error state on metric cards if the API server is unreachable
+     */
+    renderMetricsError(errorMessage) {
+        const totalFiles = document.getElementById('metricTotalFiles');
+        const hashedFiles = document.getElementById('metricHashedFiles');
+        const dupGroups = document.getElementById('metricDuplicateGroups');
+        const recStorage = document.getElementById('metricRecoverableStorage');
+        const dupCopies = document.getElementById('metricDuplicateCopies');
+
+        const errorHtml = `<span class="metric-error" title="${this.escapeHtml(errorMessage)}">--</span>`;
+        if (totalFiles) totalFiles.innerHTML = errorHtml;
+        if (hashedFiles) hashedFiles.innerHTML = errorHtml;
+        if (dupGroups) dupGroups.innerHTML = errorHtml;
+        if (recStorage) recStorage.innerHTML = errorHtml;
+        if (dupCopies) dupCopies.textContent = errorMessage || 'API server unavailable';
+    },
+
+    /**
+     * Render the 4 summary telemetry cards using actual values from GET /api/stats
+     *
+     * Mapping:
+     * - total_scanned_files -> Total Files Scanned
+     * - successfully_hashed_files -> Successfully Hashed
+     * - duplicate_groups -> Duplicate Groups
+     * - duplicate_copies -> Redundant Duplicate Copies Subtitle
+     * - recoverable_bytes -> Recoverable Storage
      */
     renderMetrics(stats) {
+        if (!stats) return;
+
         const totalFiles = document.getElementById('metricTotalFiles');
         const hashedFiles = document.getElementById('metricHashedFiles');
         const dupGroups = document.getElementById('metricDuplicateGroups');
         const dupCopies = document.getElementById('metricDuplicateCopies');
         const recStorage = document.getElementById('metricRecoverableStorage');
 
-        if (totalFiles) totalFiles.textContent = this.formatNumber(stats.total_files_discovered || 0);
-        if (hashedFiles) hashedFiles.textContent = this.formatNumber(stats.files_successfully_hashed || 0);
-        if (dupGroups) dupGroups.textContent = this.formatNumber(stats.duplicate_groups || 0);
-        if (dupCopies) dupCopies.textContent = `${this.formatNumber(stats.duplicate_copies || 0)} redundant duplicate copies`;
-        if (recStorage) recStorage.textContent = this.formatBytes(stats.recoverable_bytes || 0);
+        // Extract values supporting GET /api/stats and fallback POST /api/scan response shapes
+        const totalScanned = (stats.total_scanned_files !== undefined)
+            ? stats.total_scanned_files
+            : (stats.files_discovered !== undefined ? stats.files_discovered : stats.total_files_discovered);
+
+        const successfullyHashed = (stats.successfully_hashed_files !== undefined)
+            ? stats.successfully_hashed_files
+            : (stats.files_successfully_hashed !== undefined ? stats.files_successfully_hashed : stats.successfully_hashed);
+
+        const duplicateGroups = stats.duplicate_groups;
+        const duplicateCopies = stats.duplicate_copies;
+        const recoverableBytes = stats.recoverable_bytes;
+
+        if (totalFiles) {
+            totalFiles.textContent = this.formatNumber(totalScanned !== undefined ? totalScanned : 0);
+        }
+        if (hashedFiles) {
+            hashedFiles.textContent = this.formatNumber(successfullyHashed !== undefined ? successfullyHashed : 0);
+        }
+        if (dupGroups) {
+            dupGroups.textContent = this.formatNumber(duplicateGroups !== undefined ? duplicateGroups : 0);
+        }
+        if (dupCopies) {
+            const count = duplicateCopies !== undefined ? duplicateCopies : 0;
+            dupCopies.textContent = `${this.formatNumber(count)} redundant duplicate copies`;
+        }
+        if (recStorage) {
+            recStorage.textContent = this.formatBytes(recoverableBytes !== undefined ? recoverableBytes : 0);
+        }
     },
 
     /**
@@ -337,3 +403,4 @@ const DashboardUI = {
         container.innerHTML = html;
     }
 };
+

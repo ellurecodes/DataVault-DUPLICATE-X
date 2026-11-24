@@ -50,28 +50,45 @@ document.addEventListener('DOMContentLoaded', () => {
      * Refresh all telemetry and data from C backend
      */
     async function refreshAllData() {
+        DashboardUI.renderMetricsLoading();
         await checkHealth();
-        if (!state.isOnline) return;
+        if (!state.isOnline) {
+            DashboardUI.renderMetricsError('Server offline (127.0.0.1:8080)');
+            return;
+        }
 
         try {
-            // Fetch stats
+            // Fetch fresh stats from GET /api/stats
             const stats = await DuplicateXApi.getStats();
             state.stats = stats;
             DashboardUI.renderMetrics(stats);
 
-            // Fetch duplicates if scan has been performed
-            if (stats.has_completed_scan) {
+            // Check if scan has completed or if there are duplicate groups / scanned files
+            const hasCompleted = stats && (
+                stats.last_scan_status === 'COMPLETED' ||
+                (stats.total_scanned_files !== undefined && stats.total_scanned_files > 0) ||
+                (stats.duplicate_groups !== undefined && stats.duplicate_groups > 0)
+            );
+
+            if (hasCompleted) {
+                // Fetch fresh duplicate groups from GET /api/duplicates
                 const dupData = await DuplicateXApi.getDuplicates();
                 state.duplicateGroups = dupData.groups || [];
-                DashboardUI.renderDuplicates(state.duplicateGroups, elements.duplicateFilterInput.value);
+                DashboardUI.renderDuplicates(state.duplicateGroups, elements.duplicateFilterInput ? elements.duplicateFilterInput.value : '');
 
-                // Fetch Top K
+                // Fetch fresh Top K from GET /api/top-k?k=...
                 const topKData = await DuplicateXApi.getTopK(state.selectedK);
                 state.topKGroups = topKData.groups || [];
                 DashboardUI.renderTopK(state.topKGroups);
+            } else {
+                state.duplicateGroups = [];
+                state.topKGroups = [];
+                DashboardUI.renderDuplicates([], '');
+                DashboardUI.renderTopK([]);
             }
         } catch (err) {
             console.error('[APP] Error refreshing dashboard data:', err);
+            DashboardUI.renderMetricsError(err.message || 'Failed to fetch statistics');
         }
     }
 
@@ -197,7 +214,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elements.topKSelect) {
         elements.topKSelect.addEventListener('change', async (e) => {
             state.selectedK = parseInt(e.target.value, 10) || 5;
-            if (state.stats && state.stats.has_completed_scan) {
+            const hasCompleted = state.stats && (
+                state.stats.last_scan_status === 'COMPLETED' ||
+                (state.stats.total_scanned_files !== undefined && state.stats.total_scanned_files > 0) ||
+                (state.stats.duplicate_groups !== undefined && state.stats.duplicate_groups > 0)
+            );
+            if (hasCompleted) {
                 try {
                     const topKData = await DuplicateXApi.getTopK(state.selectedK);
                     state.topKGroups = topKData.groups || [];
@@ -234,3 +256,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Periodic heartbeat every 10 seconds to maintain connection status
     setInterval(checkHealth, 10000);
 });
+
