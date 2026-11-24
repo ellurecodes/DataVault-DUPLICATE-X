@@ -445,3 +445,4 @@ void trie_free(Trie *trie) {
     trie->total_nodes = 0;
     free(trie);
 }
+

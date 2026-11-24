@@ -170,5 +170,15 @@ if ($trieExit -ne 0) {
     exit $trieExit
 }
 
+# 8. Execute Part 6A API test suite via scripts/test_api.ps1
+Write-Host "`n[INFO] Launching Part 6A HTTP REST API test suite...`n" -ForegroundColor Cyan
+& "$PSScriptRoot/test_api.ps1"
+$apiExit = $LASTEXITCODE
+
+if ($apiExit -ne 0) {
+    Write-Host "`n[FAILURE] Part 6A API test suite failed with exit code $apiExit." -ForegroundColor Red
+    exit $apiExit
+}
+
 Write-Host "`n[SUCCESS] All test suite assertions passed successfully (exit code 0)." -ForegroundColor Green
 exit 0

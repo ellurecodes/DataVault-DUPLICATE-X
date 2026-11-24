@@ -9,6 +9,7 @@
 #include "sha256.h"
 #include "duplicate_detector.h"
 #include "trie.h"
+#include "api_server.h"
 #include "status.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,6 +29,18 @@ int wmain(int argc, wchar_t *argv[]) {
         return EXIT_FAILURE;
     }
 
+    /* Check for --server mode */
+    for (int i = 1; i < argc; i++) {
+        if (wcscmp(argv[i], L"--server") == 0) {
+            ApiEngineContext api_ctx;
+            api_engine_context_init(&api_ctx);
+            StatusCode srv_sc = api_server_run(&api_ctx, API_SERVER_DEFAULT_PORT);
+            api_engine_context_cleanup(&api_ctx);
+            engine_shutdown(&engine);
+            return (srv_sc == STATUS_SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE;
+        }
+    }
+
     /* Step 3: Parse command-line arguments (--prefix optional flag) */
     const wchar_t *query_prefix_w = NULL;
 
@@ -40,7 +53,7 @@ int wmain(int argc, wchar_t *argv[]) {
         }
     }
 
-    /* Collect target directory arguments (excluding --prefix and its argument) */
+    /* Collect target directory arguments (excluding flags and arguments) */
     const wchar_t *selected_dirs[64];
     size_t num_dirs = 0;
 
@@ -56,8 +69,9 @@ int wmain(int argc, wchar_t *argv[]) {
 
     if (num_dirs == 0) {
         printf("\n[USAGE]\n");
-        printf("  duplicate-x.exe [--prefix <path_prefix>] <directory1> [directory2] ...\n\n");
+        printf("  duplicate-x.exe [--server] [--prefix <path_prefix>] <directory1> [directory2] ...\n\n");
         printf("[EXAMPLES]\n");
+        printf("  duplicate-x.exe --server\n");
         printf("  duplicate-x.exe \"C:\\Users\\User\\Documents\" \"D:\\Backup\"\n");
         printf("  duplicate-x.exe --prefix \"C:\\Users\\User\\Documents\\Notes\" \"C:\\Users\\User\\Documents\"\n\n");
         printf("[NOTE] DUPLICATE-X will only scan directories explicitly provided above.\n");

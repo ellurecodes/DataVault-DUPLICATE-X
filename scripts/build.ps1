@@ -24,6 +24,9 @@ $SrcFiles = @(
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/duplicate_group.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/minheap.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/trie.c"),
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/api/api_server.c"),
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/api/api_router.c"),
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/api/api_response.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/platform/windows/win_file_scanner.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/platform/windows/win_crypto.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/platform/windows/win_file_compare.c")
@@ -89,7 +92,8 @@ $CompilerFlags = @(
 )
 
 $LinkerFlags = @(
-    "-lbcrypt"
+    "-lbcrypt",
+    "-lws2_32"
 )
 
 Write-Host "[INFO] Compiling backend sources:" -ForegroundColor Cyan

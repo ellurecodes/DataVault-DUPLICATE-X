@@ -165,3 +165,4 @@ Let:
 
 **Q15: What error codes does the Trie return?**  
 *Answer:* `STATUS_SUCCESS` (0) on successful completion, `STATUS_ERROR_INVALID_ARGUMENT` (101) for NULL inputs, `STATUS_ERROR_OUT_OF_MEMORY` (102) if node/edge allocation fails, and `STATUS_ERROR_PATH_NOT_FOUND` (200) when an exact path does not exist.
+

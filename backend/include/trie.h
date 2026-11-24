@@ -173,3 +173,4 @@ void trie_normalize_path(const char *input, char *output, size_t max_len);
 #endif
 
 #endif /* DATAVAULT_TRIE_H */
+

@@ -44,11 +44,14 @@ jobs:
             backend/src/ds/duplicate_group.c \
             backend/src/ds/minheap.c \
             backend/src/ds/trie.c \
+            backend/src/api/api_server.c \
+            backend/src/api/api_router.c \
+            backend/src/api/api_response.c \
             backend/src/platform/windows/win_file_scanner.c \
             backend/src/platform/windows/win_crypto.c \
             backend/src/platform/windows/win_file_compare.c \
             -o backend/build/duplicate-x.exe \
-            -lbcrypt
+            -lbcrypt -lws2_32
           ls -l backend/build/duplicate-x.exe
 
       - name: Compile Part 4 Verification Test Suite
@@ -104,6 +107,33 @@ jobs:
         shell: msys2 {0}
         run: |
           ./backend/build/test_trie.exe
+
+      - name: Compile Part 6A REST API Test Suite
+        shell: msys2 {0}
+        run: |
+          gcc -std=c11 -Wall -Wextra -Wpedantic \
+            -Ibackend/include \
+            backend/tests/test_api.c \
+            backend/src/api/api_server.c \
+            backend/src/api/api_router.c \
+            backend/src/api/api_response.c \
+            backend/src/core/duplicate_detector.c \
+            backend/src/core/file_scanner.c \
+            backend/src/ds/hashtable.c \
+            backend/src/ds/duplicate_group.c \
+            backend/src/ds/minheap.c \
+            backend/src/ds/trie.c \
+            backend/src/platform/windows/win_file_scanner.c \
+            backend/src/platform/windows/win_crypto.c \
+            backend/src/platform/windows/win_file_compare.c \
+            -o backend/build/test_api.exe \
+            -lbcrypt -lws2_32
+          ls -l backend/build/test_api.exe
+
+      - name: Execute Part 6A 15-Scenario REST API Test Suite
+        shell: msys2 {0}
+        run: |
+          ./backend/build/test_api.exe
 
       - name: Smoke Test Main CLI
         shell: msys2 {0}
