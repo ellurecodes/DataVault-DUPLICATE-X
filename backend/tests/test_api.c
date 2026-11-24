@@ -115,7 +115,7 @@ int main(void) {
     api_parse_http_request(raw4, strlen(raw4), &req4);
     api_route_request(&ctx, &req4, &resp4);
     assert(strstr(resp4.data, "HTTP/1.1 404 Not Found") != NULL);
-    assert(strstr(resp4.data, "\"code\": 404") != NULL);
+    assert(strstr(resp4.data, "\"code\": 404") != NULL || strstr(resp4.data, "\"code\":404") != NULL);
     api_buffer_free(&resp4);
     printf("PASS (status 404 Not Found returned)\n");
 

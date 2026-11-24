@@ -170,11 +170,12 @@ void api_build_error_response(ApiResponseBuffer *buf,
 
     ApiResponseBuffer json_buf;
     api_buffer_init(&json_buf);
-    api_buffer_append(&json_buf, "{\"status\":\"error\",\"code\":");
-    api_buffer_append_printf(&json_buf, "%d,\"message\":", http_status);
+    api_buffer_append(&json_buf, "{\n  \"status\": \"error\",\n  \"code\": ");
+    api_buffer_append_printf(&json_buf, "%d,\n  \"message\": ", http_status);
     api_buffer_append_escaped_json(&json_buf, error_message ? error_message : "Unknown error");
-    api_buffer_append(&json_buf, "}");
+    api_buffer_append(&json_buf, "\n}");
 
     api_build_http_response(buf, http_status, status_text, json_buf.data, origin_header);
     api_buffer_free(&json_buf);
 }
+
