@@ -19,14 +19,33 @@ const DuplicateXApi = {
 
         try {
             const url = `${this.baseUrl}${endpoint}`;
-            const response = await fetch(url, {
-                ...options,
-                signal: options.signal || controller.signal,
-                headers: {
-                    'Accept': 'application/json',
-                    ...(options.headers || {})
+            let response;
+            try {
+                response = await fetch(url, {
+                    ...options,
+                    signal: options.signal || controller.signal,
+                    headers: {
+                        'Accept': 'application/json',
+                        ...(options.headers || {})
+                    }
+                });
+            } catch (netErr) {
+                // If 127.0.0.1 failed on file:// protocol, attempt localhost fallback
+                if (this.baseUrl === 'http://127.0.0.1:8080') {
+                    const fallbackUrl = `http://localhost:8080${endpoint}`;
+                    response = await fetch(fallbackUrl, {
+                        ...options,
+                        signal: options.signal || controller.signal,
+                        headers: {
+                            'Accept': 'application/json',
+                            ...(options.headers || {})
+                        }
+                    });
+                    this.baseUrl = 'http://localhost:8080';
+                } else {
+                    throw netErr;
                 }
-            });
+            }
             clearTimeout(timeoutId);
 
             const contentType = response.headers.get('content-type') || '';

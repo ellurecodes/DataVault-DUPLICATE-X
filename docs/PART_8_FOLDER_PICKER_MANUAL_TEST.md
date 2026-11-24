@@ -89,3 +89,4 @@ To maintain 100% CI compliance while preserving native production Windows deskto
    - Both `device_laptop` and `device_usb` are now queued.
    - Click **"Run Deduplication Scan"**.
    - Watch the scan progress, find duplicate groups, and update all 4 metric cards and Top K charts!
+

@@ -23,7 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
         activeQuarantinePreview: null,
         activeRestorePreview: null,
         quarantineTimerId: null,
-        isCheckingHealth: false
+        isCheckingHealth: false,
+        hasInitialChecked: false
     };
 
     // DOM Elements
@@ -128,12 +129,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function checkHealth(manual = false) {
         if (state.isCheckingHealth) return;
         state.isCheckingHealth = true;
-        DashboardUI.renderConnectionStatus('connecting');
+        if (manual || !state.hasInitialChecked) {
+            DashboardUI.renderConnectionStatus('connecting');
+        }
 
         try {
             const health = await DuplicateXApi.getHealth();
             const wasOffline = !state.isOnline;
             state.isOnline = (health && health.status === 'ok');
+            state.hasInitialChecked = true;
             DashboardUI.renderConnectionStatus(state.isOnline, '127.0.0.1:8080');
             updateScanButtonState();
 
@@ -146,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             state.isOnline = false;
+            state.hasInitialChecked = true;
             DashboardUI.renderConnectionStatus(false);
             updateScanButtonState();
             if (manual) {
