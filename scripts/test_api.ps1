@@ -1,5 +1,5 @@
 # scripts/test_api.ps1
-# Automated PowerShell runner for DUPLICATE-X Part 6A API test suite
+# Automated PowerShell runner for DUPLICATE-X Part 6A/6B API & Frontend test suite
 
 [CmdletBinding()]
 param()
@@ -10,7 +10,7 @@ $OutputDir     = [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/build")
 $ApiTestExe    = [System.IO.Path]::GetFullPath("$OutputDir/test_api.exe")
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host " DUPLICATE-X API Test Runner" -ForegroundColor Cyan
+Write-Host " DUPLICATE-X Part 6A/6B API & UI Test Runner" -ForegroundColor Cyan
 Write-Host " Powered by Team DataVault (2026-2027)" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
@@ -87,3 +87,4 @@ if ($testExit -ne 0) {
 
 Write-Host "`n[SUCCESS] All Part 6A API test assertions passed successfully (exit code 0)." -ForegroundColor Green
 exit 0
+

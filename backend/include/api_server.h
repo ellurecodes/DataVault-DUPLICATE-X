@@ -106,3 +106,4 @@ bool api_is_origin_allowed(const char *origin);
 #endif
 
 #endif /* DATAVAULT_API_SERVER_H */
+

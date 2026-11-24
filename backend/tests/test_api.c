@@ -271,7 +271,7 @@ int main(void) {
     /* ----------------------------------------------------
      * TEST 15: Missing or empty prefix parameter handled safely
      * ---------------------------------------------------- */
-    printf("[TEST 15/15] Missing prefix parameter handled safely... ");
+    printf("[TEST 15/18] Missing prefix parameter handled safely... ");
     ApiHttpRequest req15;
     ApiResponseBuffer resp15;
     api_buffer_init(&resp15);
@@ -282,10 +282,55 @@ int main(void) {
     api_buffer_free(&resp15);
     printf("PASS (empty prefix returned all indexed files cleanly)\n");
 
+    /* ----------------------------------------------------
+     * TEST 16: GET / serves frontend index.html
+     * ---------------------------------------------------- */
+    printf("[TEST 16/18] GET / serves frontend index.html (HTTP 200)... ");
+    ApiHttpRequest req16;
+    ApiResponseBuffer resp16;
+    api_buffer_init(&resp16);
+    const char *raw16 = "GET / HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n\r\n";
+    api_parse_http_request(raw16, strlen(raw16), &req16);
+    api_route_request(&ctx, &req16, &resp16);
+    assert(strstr(resp16.data, "HTTP/1.1 200 OK") != NULL);
+    assert(strstr(resp16.data, "Content-Type: text/html") != NULL);
+    assert(strstr(resp16.data, "DUPLICATE-X") != NULL);
+    api_buffer_free(&resp16);
+    printf("PASS (index.html served with text/html)\n");
+
+    /* ----------------------------------------------------
+     * TEST 17: GET /css/style.css serves CSS stylesheet
+     * ---------------------------------------------------- */
+    printf("[TEST 17/18] GET /css/style.css serves CSS stylesheet (HTTP 200)... ");
+    ApiHttpRequest req17;
+    ApiResponseBuffer resp17;
+    api_buffer_init(&resp17);
+    const char *raw17 = "GET /css/style.css HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n\r\n";
+    api_parse_http_request(raw17, strlen(raw17), &req17);
+    api_route_request(&ctx, &req17, &resp17);
+    assert(strstr(resp17.data, "HTTP/1.1 200 OK") != NULL);
+    assert(strstr(resp17.data, "Content-Type: text/css") != NULL);
+    api_buffer_free(&resp17);
+    printf("PASS (style.css served with text/css)\n");
+
+    /* ----------------------------------------------------
+     * TEST 18: Directory traversal attempt is blocked with HTTP 403
+     * ---------------------------------------------------- */
+    printf("[TEST 18/18] Path traversal (/../secret.txt) returns HTTP 403... ");
+    ApiHttpRequest req18;
+    ApiResponseBuffer resp18;
+    api_buffer_init(&resp18);
+    const char *raw18 = "GET /../secret.txt HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n\r\n";
+    api_parse_http_request(raw18, strlen(raw18), &req18);
+    api_route_request(&ctx, &req18, &resp18);
+    assert(strstr(resp18.data, "HTTP/1.1 403 Forbidden") != NULL);
+    api_buffer_free(&resp18);
+    printf("PASS (directory traversal blocked with HTTP 403)\n");
+
     api_engine_context_cleanup(&ctx);
 
     printf("\n====================================================\n");
-    printf(" ALL 15 REST API VERIFICATION TESTS PASSED WITH 100%% SUCCESS!\n");
+    printf(" ALL 18 REST API & FRONTEND SERVING TESTS PASSED WITH 100%% SUCCESS!\n");
     printf("====================================================\n");
 
     return EXIT_SUCCESS;

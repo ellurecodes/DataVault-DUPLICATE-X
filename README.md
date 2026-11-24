@@ -1,4 +1,4 @@
-git --version# DUPLICATE-X: Intelligent Multi-Device File Deduplication & Storage Optimization System
+# DUPLICATE-X: Intelligent Multi-Device File Deduplication & Storage Optimization System
 ### Developed by Team DataVault | Academic Year 2026–2027
 
 ---
@@ -103,16 +103,37 @@ backend/build/duplicate-x.exe
 # Display usage
 powershell -ExecutionPolicy Bypass -File scripts/run.ps1
 
-# Scan target directories
+# Scan target directories via CLI
 powershell -ExecutionPolicy Bypass -File scripts/run.ps1 "data/test_files/device_laptop" "data/test_files/device_usb"
 ```
 
-### Running Tests Locally:
-To build the test fixtures and execute the 12-scenario Part 4 verification test suite:
+### Launching the Web Dashboard (Part 6B):
+DUPLICATE-X embeds a high-performance Winsock2 HTTP server that serves both the REST API and the frontend dashboard from a single C binary:
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/test.ps1
+# Start local C Winsock2 server on 127.0.0.1:8080
+.\backend\build\duplicate-x.exe --server
 ```
-*Note on Windows 11 Smart App Control (SAC):* If Smart App Control is enabled in Enforcement Mode (`VerifiedAndReputablePolicyState = 1`), execution of newly compiled unsigned native binaries may be intercepted by host Code Integrity policies. The test script detects this condition, reports diagnostic information, and halts with an error rather than falsely claiming test success.
+Open your web browser and navigate to:
+```text
+http://127.0.0.1:8080
+```
+From the interactive dashboard, you can:
+- Queue arbitrary native Windows directories.
+- Run multi-directory deduplication scans with live visual telemetry.
+- View Top K storage waste rankings calculated by the C11 Binary Min Heap ($O(N \log K)$).
+- Inspect discovered duplicate groups in expandable accordions with byte-level verification status.
+- Perform instantaneous path prefix queries powered by the custom C11 Prefix Trie ($O(L)$).
+
+### Running Tests Locally:
+To build the test fixtures and execute the verification test suites:
+```powershell
+# Part 4 Verification
+powershell -ExecutionPolicy Bypass -File scripts/test.ps1
+
+# Part 6A/6B API & Static Asset Serving Verification
+powershell -ExecutionPolicy Bypass -File scripts/test_api.ps1
+```
+*Note on Windows 11 Smart App Control (SAC):* If Smart App Control is enabled in Enforcement Mode (`VerifiedAndReputablePolicyState = 1`), execution of newly compiled unsigned native binaries may be intercepted by host Code Integrity policies. The test scripts detect this condition and report diagnostic information. Complete test execution is verified on GitHub-hosted Windows runners.
 
 ### Running Tests via GitHub Actions CI:
 A standardized Windows CI workflow is provided at `.github/workflows/windows-tests.yml`.
@@ -123,12 +144,12 @@ A standardized Windows CI workflow is provided at `.github/workflows/windows-tes
 2. **What the CI Workflow Executes:**
    - Runs on a GitHub-hosted `windows-latest` runner.
    - Provisions the official `mingw-w64-ucrt-x86_64-gcc` toolchain via MSYS2.
-   - Compiles both `duplicate-x.exe` and `test_duplicate_detector.exe`.
-   - Executes all 12 test scenarios in `test_duplicate_detector.exe`.
-   - Executes `duplicate-x.exe --help` smoke test.
-3. **Interpreting CI Results:**
-   - **Green Checkmark (PASS):** All 12 test scenarios completed with 100% assertions verified and exit code `0`.
-   - **Red Cross (FAIL):** Any C assertion failed or compilation aborted, failing the entire job and preserving step logs.
+   - Compiles and runs all modular test suites:
+     - Part 4 (12 tests): Hash Table Separate Chaining & Linked List Grouping.
+     - Part 5A (15 tests): Binary Min Heap & Top K Storage Waste.
+     - Part 5B (18 tests): Prefix Trie & Path Sub-Tree Search.
+     - Part 6A/6B (18 tests): Winsock2 REST API & Static Asset File Serving.
+   - Executes `duplicate-x.exe --help` CLI smoke test.
 
 ---
 
@@ -141,12 +162,16 @@ A standardized Windows CI workflow is provided at `.github/workflows/windows-tes
 | **Data Structures Formal Spec** | Completed | `DATA_STRUCTURES.md` with Hash Table, Linked List, Heap, Trie, Graph. |
 | **Project Scaffolding** | Completed | Clean modular directory structure (`backend/`, `frontend/`, `scripts/`). |
 | **Initial C11 Foundation** | Completed | `config.h`, `status.h`, `engine.h`, `engine.c`, `main.c`. |
-| **Build & Run Automation** | Completed | `scripts/build.ps1`, `scripts/run.ps1`, `scripts/test.ps1`. |
+| **Build & Run Automation** | Completed | `scripts/build.ps1`, `scripts/run.ps1`, `scripts/test.ps1`, `scripts/test_api.ps1`. |
 | **File Scanner Module** | Completed | Recursive Unicode traversal (`win_file_scanner.c`), dynamic `FileInventory`. |
 | **SHA-256 Engine (BCrypt)** | Completed | Windows BCrypt 64KB chunk streaming (`win_crypto.c`) with modification safety checks. |
 | **Part 4: Custom Hash Table** | Completed | Separate chaining, prime capacities, dynamic resizing at $\alpha > 0.75$, 64-bit FNV-1a. |
 | **Part 4: Duplicate Group Lists** | Completed | Non-owning `FileNode` linked lists, recoverable storage math. |
 | **Part 4: Byte-by-Byte Comparator** | Completed | 64KB streaming buffer, `CreateFileW` with `FILE_SHARE_READ`. |
 | **Part 4: Duplicate Detection Engine** | Completed | 10-step grouping pipeline, cryptographic collision branch isolation. |
-| **Part 4 Verification Test Suite** | Compiled (CI Configured) | All 12 scenarios implemented in `test_duplicate_detector.c`; local runtime pending due to Windows SAC; automated Windows CI workflow configured. |
+| **Part 4 Test Suite (12 Scenarios)** | Verified (12/12 Passed) | Verified on GitHub Actions Windows CI runner. |
+| **Part 5A: Binary Min Heap** | Verified (15/15 Passed) | Custom Min Heap, Top K storage ranking ($O(N \log K)$), verified on GitHub Actions. |
+| **Part 5B: Prefix Trie** | Verified (18/18 Passed) | Custom Prefix Trie, sub-tree path search ($O(L)$), verified on GitHub Actions. |
+| **Part 6A: Local C REST API** | Verified (15/15 Passed) | Pure C Winsock2 HTTP/1.1 REST API, JSON serialization, loopback binding. |
+| **Part 6B: Frontend Dashboard** | Completed & Verified | HTML5/CSS3/Vanilla JS dark navy UI, static file routing, path traversal protection (18/18 tests). |
 

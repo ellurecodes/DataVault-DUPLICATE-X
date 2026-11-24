@@ -19,6 +19,7 @@ static void handle_duplicates(ApiEngineContext *ctx, const ApiHttpRequest *req, 
 static void handle_top_k(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
 static void handle_search_prefix(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
 static void handle_scan(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
+static void handle_static_file(const ApiHttpRequest *req, ApiResponseBuffer *resp);
 
 /* Helper to convert hex character to integer */
 static int hex_char_to_int(char c) {
@@ -145,68 +146,161 @@ void api_route_request(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResp
         return;
     }
 
-    /* Route: GET /api/health */
-    if (strcmp(req->path, "/api/health") == 0) {
-        if (strcmp(req->method, "GET") != 0) {
-            api_build_error_response(out_resp, 405, "Method Not Allowed. Use GET.", req->origin);
+    /* Route REST API endpoints (/api/...) */
+    if (strncmp(req->path, "/api/", 5) == 0 || strcmp(req->path, "/api") == 0) {
+        /* Route: GET /api/health */
+        if (strcmp(req->path, "/api/health") == 0) {
+            if (strcmp(req->method, "GET") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use GET.", req->origin);
+                return;
+            }
+            handle_health(req, out_resp);
             return;
         }
-        handle_health(req, out_resp);
+
+        /* Route: GET /api/stats */
+        if (strcmp(req->path, "/api/stats") == 0) {
+            if (strcmp(req->method, "GET") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use GET.", req->origin);
+                return;
+            }
+            handle_stats(ctx, req, out_resp);
+            return;
+        }
+
+        /* Route: GET /api/duplicates */
+        if (strcmp(req->path, "/api/duplicates") == 0) {
+            if (strcmp(req->method, "GET") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use GET.", req->origin);
+                return;
+            }
+            handle_duplicates(ctx, req, out_resp);
+            return;
+        }
+
+        /* Route: GET /api/top-k */
+        if (strcmp(req->path, "/api/top-k") == 0) {
+            if (strcmp(req->method, "GET") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use GET.", req->origin);
+                return;
+            }
+            handle_top_k(ctx, req, out_resp);
+            return;
+        }
+
+        /* Route: GET /api/search/prefix */
+        if (strcmp(req->path, "/api/search/prefix") == 0) {
+            if (strcmp(req->method, "GET") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use GET.", req->origin);
+                return;
+            }
+            handle_search_prefix(ctx, req, out_resp);
+            return;
+        }
+
+        /* Route: POST /api/scan */
+        if (strcmp(req->path, "/api/scan") == 0) {
+            if (strcmp(req->method, "POST") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use POST.", req->origin);
+                return;
+            }
+            handle_scan(ctx, req, out_resp);
+            return;
+        }
+
+        /* Unknown /api/ endpoint returns HTTP 404 JSON */
+        api_build_error_response(out_resp, 404, "Endpoint not found on DUPLICATE-X API server.", req->origin);
         return;
     }
 
-    /* Route: GET /api/stats */
-    if (strcmp(req->path, "/api/stats") == 0) {
-        if (strcmp(req->method, "GET") != 0) {
-            api_build_error_response(out_resp, 405, "Method Not Allowed. Use GET.", req->origin);
-            return;
-        }
-        handle_stats(ctx, req, out_resp);
+    /* Otherwise, serve static frontend assets */
+    handle_static_file(req, out_resp);
+}
+
+static void handle_static_file(const ApiHttpRequest *req, ApiResponseBuffer *resp) {
+    if (strcmp(req->method, "GET") != 0 && strcmp(req->method, "HEAD") != 0) {
+        api_build_error_response(resp, 405, "Method Not Allowed. Use GET.", req->origin);
         return;
     }
 
-    /* Route: GET /api/duplicates */
-    if (strcmp(req->path, "/api/duplicates") == 0) {
-        if (strcmp(req->method, "GET") != 0) {
-            api_build_error_response(out_resp, 405, "Method Not Allowed. Use GET.", req->origin);
-            return;
-        }
-        handle_duplicates(ctx, req, out_resp);
+    const char *path = req->path;
+    if (strcmp(path, "/") == 0) {
+        path = "/index.html";
+    }
+
+    /* Path traversal security check: reject '..', ':', or '\' */
+    if (strstr(path, "..") != NULL || strchr(path, ':') != NULL || strchr(path, '\\') != NULL) {
+        api_build_error_response(resp, 403, "Access Denied: Path traversal detected.", req->origin);
         return;
     }
 
-    /* Route: GET /api/top-k */
-    if (strcmp(req->path, "/api/top-k") == 0) {
-        if (strcmp(req->method, "GET") != 0) {
-            api_build_error_response(out_resp, 405, "Method Not Allowed. Use GET.", req->origin);
-            return;
-        }
-        handle_top_k(ctx, req, out_resp);
+    /* Strip leading slashes */
+    while (*path == '/') path++;
+
+    /* Locate file: first try frontend/<path>, then ../frontend/<path> */
+    char full_path[1200];
+    snprintf(full_path, sizeof(full_path), "frontend/%s", path);
+
+    FILE *f = fopen(full_path, "rb");
+    if (!f) {
+        snprintf(full_path, sizeof(full_path), "../frontend/%s", path);
+        f = fopen(full_path, "rb");
+    }
+
+    if (!f) {
+        api_build_error_response(resp, 404, "Static file not found.", req->origin);
         return;
     }
 
-    /* Route: GET /api/search/prefix */
-    if (strcmp(req->path, "/api/search/prefix") == 0) {
-        if (strcmp(req->method, "GET") != 0) {
-            api_build_error_response(out_resp, 405, "Method Not Allowed. Use GET.", req->origin);
-            return;
-        }
-        handle_search_prefix(ctx, req, out_resp);
+    /* Determine file size */
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (size < 0) {
+        fclose(f);
+        api_build_error_response(resp, 500, "Error reading file length.", req->origin);
         return;
     }
 
-    /* Route: POST /api/scan */
-    if (strcmp(req->path, "/api/scan") == 0) {
-        if (strcmp(req->method, "POST") != 0) {
-            api_build_error_response(out_resp, 405, "Method Not Allowed. Use POST.", req->origin);
-            return;
-        }
-        handle_scan(ctx, req, out_resp);
+    char *data = (char *)malloc((size_t)size > 0 ? (size_t)size : 1);
+    if (!data) {
+        fclose(f);
+        api_build_error_response(resp, 500, "Memory allocation error.", req->origin);
         return;
     }
 
-    /* Route not found */
-    api_build_error_response(out_resp, 404, "Endpoint not found on DUPLICATE-X API server.", req->origin);
+    if (size > 0) {
+        size_t nread = fread(data, 1, (size_t)size, f);
+        (void)nread;
+    }
+    fclose(f);
+
+    /* Determine MIME content type based on extension */
+    const char *mime = "text/plain; charset=utf-8";
+    const char *dot = strrchr(path, '.');
+    if (dot) {
+        if (_stricmp(dot, ".html") == 0 || _stricmp(dot, ".htm") == 0) {
+            mime = "text/html; charset=utf-8";
+        } else if (_stricmp(dot, ".css") == 0) {
+            mime = "text/css; charset=utf-8";
+        } else if (_stricmp(dot, ".js") == 0) {
+            mime = "application/javascript; charset=utf-8";
+        } else if (_stricmp(dot, ".json") == 0) {
+            mime = "application/json; charset=utf-8";
+        } else if (_stricmp(dot, ".png") == 0) {
+            mime = "image/png";
+        } else if (_stricmp(dot, ".jpg") == 0 || _stricmp(dot, ".jpeg") == 0) {
+            mime = "image/jpeg";
+        } else if (_stricmp(dot, ".ico") == 0) {
+            mime = "image/x-icon";
+        } else if (_stricmp(dot, ".svg") == 0) {
+            mime = "image/svg+xml";
+        }
+    }
+
+    api_build_raw_http_response(resp, 200, "OK", mime, data, (size_t)size, req->origin);
+    free(data);
 }
 
 static void handle_health(const ApiHttpRequest *req, ApiResponseBuffer *resp) {
@@ -484,3 +578,4 @@ static void handle_scan(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiRes
     api_build_http_response(resp, 200, "OK", json.data, req->origin);
     api_buffer_free(&json);
 }
+

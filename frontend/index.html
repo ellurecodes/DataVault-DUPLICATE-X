@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataVault DUPLICATE-X | Intelligent File Deduplication &amp; Storage Optimization</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+</head>
+<body>
+    <!-- Top Navigation / Application Header -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="brand-group">
+                <div class="brand-logo">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        <path d="M9 12l2 2 4-4"/>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title-wrap">
+                        <span class="brand-name">DataVault</span>
+                        <span class="brand-badge">DUPLICATE-X</span>
+                    </div>
+                    <span class="brand-tagline">Smarter Storage. Zero Duplicate Waste.</span>
+                </div>
+            </div>
+
+            <div class="header-controls">
+                <div id="connectionStatus" class="status-pill status-checking">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Connecting...</span>
+                </div>
+                <button id="btnRefresh" class="btn btn-secondary btn-icon" title="Refresh Engine Stats">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    <span>Refresh</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="main-container">
+
+        <!-- 4 Summary Telemetry Cards -->
+        <section class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-icon icon-cyan">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </div>
+                <div class="metric-content">
+                    <span class="metric-label">Total Files Scanned</span>
+                    <span id="metricTotalFiles" class="metric-value">0</span>
+                    <span class="metric-sub">Across targeted storage volumes</span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon icon-blue">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                </div>
+                <div class="metric-content">
+                    <span class="metric-label">Successfully Hashed</span>
+                    <span id="metricHashedFiles" class="metric-value">0</span>
+                    <span class="metric-sub">Cryptographic SHA-256 signatures</span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon icon-amber">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </div>
+                <div class="metric-content">
+                    <span class="metric-label">Duplicate Groups</span>
+                    <span id="metricDuplicateGroups" class="metric-value">0</span>
+                    <span id="metricDuplicateCopies" class="metric-sub">0 duplicate redundant copies</span>
+                </div>
+            </div>
+
+            <div class="metric-card metric-card-highlight">
+                <div class="metric-icon icon-green">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                </div>
+                <div class="metric-content">
+                    <span class="metric-label">Recoverable Storage</span>
+                    <span id="metricRecoverableStorage" class="metric-value">0 B</span>
+                    <span class="metric-sub">Reclaimable without data loss</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 1: Folder Scanner & Targeted Volumes -->
+        <section class="dashboard-section card">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        Target Storage Directories
+                    </h2>
+                    <p class="section-desc">Specify target Windows directories for recursive traversal, SHA-256 hashing, and duplicate detection.</p>
+                </div>
+                <span class="tag tag-cyan">Read-Only Safe Mode</span>
+            </div>
+
+            <div class="dir-input-container">
+                <div class="input-with-button">
+                    <div class="input-icon-wrapper">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <input type="text" id="dirInput" class="form-input" placeholder="Enter absolute directory path, e.g. C:\Users\User\Documents">
+                    </div>
+                    <button id="btnAddDir" class="btn btn-secondary">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Add Directory
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dynamic Selected Directories List -->
+            <div class="configured-dirs-wrapper">
+                <div class="dirs-header">
+                    <span class="dirs-count">Target Queue (<span id="configuredDirsCount">0</span>)</span>
+                    <button id="btnClearAllDirs" class="btn-link" style="display: none;">Clear All</button>
+                </div>
+                <div id="configuredDirsList" class="configured-dirs-list">
+                    <div class="empty-dirs-hint">No directories queued. Enter a Windows directory path above to begin scanning.</div>
+                </div>
+            </div>
+
+            <!-- Scan Action Bar -->
+            <div class="scan-actions-bar">
+                <button id="btnStartScan" class="btn btn-primary btn-large">
+                    <svg class="scan-btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span id="scanBtnText">Run Deduplication Scan</span>
+                </button>
+                <div id="scanStatusIndicator" class="scan-status-indicator" style="display: none;">
+                    <div class="spinner"></div>
+                    <span id="scanStatusMsg">Executing traversal, hashing and duplicate verification...</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Top K Storage Waste (Binary Min Heap) -->
+        <section class="dashboard-section card">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                        Top Storage Waste Rankings
+                    </h2>
+                    <p class="section-desc">Identifies duplicate groups causing the highest storage waste using the custom C11 Binary Min Heap.</p>
+                </div>
+                <div class="section-header-right">
+                    <span class="tag tag-blue">Binary Min Heap O(N log K)</span>
+                    <div class="k-selector">
+                        <label for="topKSelect">Top K:</label>
+                        <select id="topKSelect" class="form-select">
+                            <option value="3">Top 3</option>
+                            <option value="5" selected>Top 5</option>
+                            <option value="10">Top 10</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div id="topKContainer" class="topk-container">
+                <div class="empty-state">Run a scan above to calculate Top K storage-wasting duplicate groups.</div>
+            </div>
+        </section>
+
+        <!-- Section 3: Duplicate File Explorer (Hash Table & Linked Lists) -->
+        <section class="dashboard-section card">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Duplicate File Explorer
+                    </h2>
+                    <p class="section-desc">Discovered duplicate groups verified byte-by-byte via custom Hash Table with Separate Chaining.</p>
+                </div>
+                <span class="tag tag-amber">Hash Table &amp; Linked Lists</span>
+            </div>
+
+            <!-- Filter and Count Toolbar -->
+            <div class="explorer-toolbar">
+                <div class="input-icon-wrapper" style="max-width: 400px; flex: 1;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="duplicateFilterInput" class="form-input" placeholder="Filter by filename, extension, or SHA-256...">
+                </div>
+                <div class="explorer-stats">
+                    Showing <span id="displayedGroupsCount">0</span> groups (<span id="displayedCopiesCount">0</span> copies)
+                </div>
+            </div>
+
+            <!-- Accordion List of Duplicate Groups -->
+            <div id="duplicatesAccordion" class="duplicates-accordion">
+                <div class="empty-state">No duplicate files detected yet. Add directories and click "Run Deduplication Scan".</div>
+            </div>
+        </section>
+
+        <!-- Section 4: Path Prefix Search (Prefix Trie) -->
+        <section class="dashboard-section card">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        </svg>
+                        Fast Path Prefix Search
+                    </h2>
+                    <p class="section-desc">Perform instantaneous sub-tree queries across all indexed files using the custom C11 Prefix Trie.</p>
+                </div>
+                <span class="tag tag-purple">Prefix Trie O(L)</span>
+            </div>
+
+            <div class="prefix-search-bar">
+                <div class="input-icon-wrapper" style="flex: 1;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="prefixInput" class="form-input" placeholder="Enter path prefix (e.g. C:\Users or D:\Backup)...">
+                </div>
+                <button id="btnSearchPrefix" class="btn btn-secondary">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                    Search Trie
+                </button>
+            </div>
+
+            <!-- Prefix Results Container -->
+            <div id="prefixResultsContainer" class="prefix-results-container">
+                <div class="empty-state">Enter a directory path prefix to query the Trie index.</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Global Application Footer -->
+    <footer class="app-footer">
+        <div class="footer-container">
+            <div class="footer-left">
+                <strong>DataVault DUPLICATE-X</strong> &mdash; College EL Project (Academic Year 2026&ndash;2027)
+            </div>
+            <div class="footer-right">
+                <span>C11 Engine</span>
+                <span class="footer-sep">&bull;</span>
+                <span>Winsock2 HTTP API</span>
+                <span class="footer-sep">&bull;</span>
+                <span>SHA-256 Engine</span>
+                <span class="footer-sep">&bull;</span>
+                <span>Min Heap &amp; Trie</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Frontend Application Scripts -->
+    <script src="/js/api.js"></script>
+    <script src="/js/dashboard.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

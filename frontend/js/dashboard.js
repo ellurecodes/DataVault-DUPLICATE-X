@@ -1,0 +1,339 @@
+/**
+ * @file dashboard.js
+ * @brief Pure UI rendering functions, text escaping, and DOM builders.
+ * @author DataVault Team (Academic Year 2026-2027)
+ */
+
+const DashboardUI = {
+    /**
+     * Format byte values into human-readable units (B, KB, MB, GB, TB)
+     */
+    formatBytes(bytes) {
+        if (bytes === undefined || bytes === null || isNaN(bytes)) return '0 B';
+        const num = Number(bytes);
+        if (num === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+        const i = Math.floor(Math.log(num) / Math.log(k));
+        const idx = Math.min(i, sizes.length - 1);
+        const formatted = (num / Math.pow(k, idx)).toFixed(2);
+        return `${parseFloat(formatted)} ${sizes[idx]}`;
+    },
+
+    /**
+     * Format number with comma separators
+     */
+    formatNumber(num) {
+        if (num === undefined || num === null || isNaN(num)) return '0';
+        return Number(num).toLocaleString();
+    },
+
+    /**
+     * Truncate SHA-256 hash for display
+     */
+    truncateHash(hash) {
+        if (!hash || typeof hash !== 'string') return '';
+        if (hash.length <= 16) return hash;
+        return `${hash.substring(0, 8)}...${hash.substring(hash.length - 8)}`;
+    },
+
+    /**
+     * Safe HTML string escaper to prevent XSS
+     */
+    escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    },
+
+    /**
+     * Render server connection status pill
+     */
+    renderConnectionStatus(isOnline, hostText = '127.0.0.1:8080') {
+        const el = document.getElementById('connectionStatus');
+        if (!el) return;
+
+        el.className = 'status-pill ' + (isOnline ? 'status-online' : 'status-offline');
+        el.innerHTML = `
+            <span class="status-dot"></span>
+            <span class="status-text">${isOnline ? `Online (${hostText})` : 'Server Offline'}</span>
+        `;
+    },
+
+    /**
+     * Render the 4 summary telemetry cards
+     */
+    renderMetrics(stats) {
+        const totalFiles = document.getElementById('metricTotalFiles');
+        const hashedFiles = document.getElementById('metricHashedFiles');
+        const dupGroups = document.getElementById('metricDuplicateGroups');
+        const dupCopies = document.getElementById('metricDuplicateCopies');
+        const recStorage = document.getElementById('metricRecoverableStorage');
+
+        if (totalFiles) totalFiles.textContent = this.formatNumber(stats.total_files_discovered || 0);
+        if (hashedFiles) hashedFiles.textContent = this.formatNumber(stats.files_successfully_hashed || 0);
+        if (dupGroups) dupGroups.textContent = this.formatNumber(stats.duplicate_groups || 0);
+        if (dupCopies) dupCopies.textContent = `${this.formatNumber(stats.duplicate_copies || 0)} redundant duplicate copies`;
+        if (recStorage) recStorage.textContent = this.formatBytes(stats.recoverable_bytes || 0);
+    },
+
+    /**
+     * Render configured directory badge chips
+     */
+    renderConfiguredDirs(directories, onRemoveCallback) {
+        const container = document.getElementById('configuredDirsList');
+        const countEl = document.getElementById('configuredDirsCount');
+        const clearBtn = document.getElementById('btnClearAllDirs');
+        if (!container) return;
+
+        if (countEl) countEl.textContent = directories.length;
+        if (clearBtn) clearBtn.style.display = directories.length > 0 ? 'inline-block' : 'none';
+
+        if (directories.length === 0) {
+            container.innerHTML = `<div class="empty-dirs-hint">No directories queued. Enter a Windows directory path above to begin scanning.</div>`;
+            return;
+        }
+
+        container.innerHTML = '';
+        directories.forEach((dir, index) => {
+            const chip = document.createElement('div');
+            chip.className = 'dir-chip';
+
+            const textSpan = document.createElement('span');
+            textSpan.textContent = dir;
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'dir-chip-remove';
+            removeBtn.innerHTML = '&times;';
+            removeBtn.title = 'Remove directory';
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                onRemoveCallback(index);
+            });
+
+            chip.appendChild(textSpan);
+            chip.appendChild(removeBtn);
+            container.appendChild(chip);
+        });
+    },
+
+    /**
+     * Render Top K Storage Ranking items with visual waste bars
+     */
+    renderTopK(groups) {
+        const container = document.getElementById('topKContainer');
+        if (!container) return;
+
+        if (!groups || groups.length === 0) {
+            container.innerHTML = `<div class="empty-state">No duplicate storage waste detected in current scan.</div>`;
+            return;
+        }
+
+        // Find max recoverable bytes for relative bar calculation
+        const maxWaste = Math.max(...groups.map(g => Number(g.recoverable_bytes || 0)), 1);
+
+        container.innerHTML = '';
+        groups.forEach((group, index) => {
+            const rank = index + 1;
+            const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+            const recoverable = Number(group.recoverable_bytes || 0);
+            const percent = Math.min(100, Math.max(5, Math.round((recoverable / maxWaste) * 100)));
+
+            const item = document.createElement('div');
+            item.className = 'topk-item';
+
+            item.innerHTML = `
+                <div class="topk-rank ${rankClass}">#${rank}</div>
+                <div class="topk-info">
+                    <div class="topk-name" title="${this.escapeHtml(group.primary_filename || 'Unknown')}">
+                        ${this.escapeHtml(group.primary_filename || 'Unknown')}
+                    </div>
+                    <div class="topk-meta">
+                        <span>${this.formatNumber(group.file_count || 0)} copies</span>
+                        <span>Group ID: #${this.escapeHtml(group.group_id)}</span>
+                        <span class="topk-hash" title="SHA-256: ${this.escapeHtml(group.sha256)}">${this.truncateHash(group.sha256)}</span>
+                    </div>
+                </div>
+                <div class="topk-waste-wrap">
+                    <span class="topk-waste-val">+${this.formatBytes(recoverable)}</span>
+                    <div class="topk-bar-bg">
+                        <div class="topk-bar-fill" style="width: ${percent}%;"></div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    },
+
+    /**
+     * Render Duplicate File Explorer groups in an expandable accordion
+     */
+    renderDuplicates(groups, filterText = '') {
+        const container = document.getElementById('duplicatesAccordion');
+        const countGroupsEl = document.getElementById('displayedGroupsCount');
+        const countCopiesEl = document.getElementById('displayedCopiesCount');
+        if (!container) return;
+
+        const query = filterText.trim().toLowerCase();
+
+        // Filter groups based on query matching filename, sha256, or group id
+        const filtered = (groups || []).filter(grp => {
+            if (!query) return true;
+            if (grp.primary_filename && grp.primary_filename.toLowerCase().includes(query)) return true;
+            if (grp.sha256 && grp.sha256.toLowerCase().includes(query)) return true;
+            if (String(grp.group_id).includes(query)) return true;
+            if (grp.files && grp.files.some(f => (f.filepath && f.filepath.toLowerCase().includes(query)) || (f.filename && f.filename.toLowerCase().includes(query)))) {
+                return true;
+            }
+            return false;
+        });
+
+        const totalCopies = filtered.reduce((acc, g) => acc + (Number(g.file_count) || 0), 0);
+
+        if (countGroupsEl) countGroupsEl.textContent = this.formatNumber(filtered.length);
+        if (countCopiesEl) countCopiesEl.textContent = this.formatNumber(totalCopies);
+
+        if (filtered.length === 0) {
+            container.innerHTML = query
+                ? `<div class="empty-state">No duplicate groups match filter "${this.escapeHtml(query)}".</div>`
+                : `<div class="empty-state">No duplicate groups found. Queue directories above and run a scan.</div>`;
+            return;
+        }
+
+        container.innerHTML = '';
+        filtered.forEach((grp, idx) => {
+            const card = document.createElement('div');
+            card.className = 'accordion-group' + (idx === 0 ? ' open' : ''); // Expand first group by default
+
+            // Accordion Header
+            const header = document.createElement('div');
+            header.className = 'accordion-header';
+            header.innerHTML = `
+                <div class="accordion-title-group">
+                    <span class="group-badge">GRP #${this.escapeHtml(grp.group_id)}</span>
+                    <span class="group-primary-file" title="${this.escapeHtml(grp.primary_filename)}">${this.escapeHtml(grp.primary_filename)}</span>
+                    <span class="group-hash-chip" title="Cryptographic SHA-256 Fingerprint">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        ${this.truncateHash(grp.sha256)}
+                    </span>
+                </div>
+                <div class="accordion-meta-group">
+                    <span class="waste-pill" title="Recoverable space if duplicates are cleaned">+${this.formatBytes(grp.recoverable_bytes)} waste</span>
+                    <span class="copies-pill">${this.formatNumber(grp.file_count)} files</span>
+                    <svg class="accordion-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </div>
+            `;
+
+            header.addEventListener('click', () => {
+                card.classList.toggle('open');
+            });
+
+            // Accordion Content (Table of files in group)
+            const content = document.createElement('div');
+            content.className = 'accordion-content';
+
+            let tableHtml = `
+                <table class="file-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 100px;">Status</th>
+                            <th style="width: 110px;">Device / Volume</th>
+                            <th>Filename &amp; Path</th>
+                            <th style="width: 100px; text-align: right;">Size</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            (grp.files || []).forEach((f, fileIdx) => {
+                const isOriginal = fileIdx === 0;
+                tableHtml += `
+                    <tr>
+                        <td>
+                            <span class="file-role-badge ${isOriginal ? 'role-original' : 'role-duplicate'}">
+                                ${isOriginal ? 'Original / Keep' : 'Duplicate'}
+                            </span>
+                        </td>
+                        <td><strong>${this.escapeHtml(f.device_id || 'Local')}</strong></td>
+                        <td>
+                            <div style="font-weight: 600;">${this.escapeHtml(f.filename || '')}</div>
+                            <div class="file-path-cell">${this.escapeHtml(f.filepath || '')}</div>
+                        </td>
+                        <td style="text-align: right; font-weight: 600;">${this.formatBytes(f.file_size)}</td>
+                    </tr>
+                `;
+            });
+
+            tableHtml += `
+                    </tbody>
+                </table>
+            `;
+
+            content.innerHTML = tableHtml;
+            card.appendChild(header);
+            card.appendChild(content);
+            container.appendChild(card);
+        });
+    },
+
+    /**
+     * Render Prefix Trie Search Results
+     */
+    renderPrefixResults(results, queryPrefix) {
+        const container = document.getElementById('prefixResultsContainer');
+        if (!container) return;
+
+        if (!results || results.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    No files found matching prefix "<strong>${this.escapeHtml(queryPrefix)}</strong>" in Prefix Trie.
+                </div>
+            `;
+            return;
+        }
+
+        let html = `
+            <div style="margin-bottom: 12px; font-size: 0.8rem; color: var(--text-secondary);">
+                Found <strong style="color: var(--accent-cyan);">${this.formatNumber(results.length)}</strong> matching file path(s) under prefix "<strong>${this.escapeHtml(queryPrefix)}</strong>":
+            </div>
+            <table class="file-table">
+                <thead>
+                    <tr>
+                        <th style="width: 120px;">Device</th>
+                        <th>Matched File Path</th>
+                        <th style="width: 100px; text-align: right;">Size</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        results.forEach(res => {
+            html += `
+                <tr>
+                    <td><strong>${this.escapeHtml(res.device_id || 'Drive')}</strong></td>
+                    <td>
+                        <div style="font-weight: 600;">${this.escapeHtml(res.filename || '')}</div>
+                        <div class="file-path-cell">${this.escapeHtml(res.filepath || '')}</div>
+                    </td>
+                    <td style="text-align: right; font-weight: 600;">${this.formatBytes(res.file_size)}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+                </tbody>
+            </table>
+        `;
+
+        container.innerHTML = html;
+    }
+};

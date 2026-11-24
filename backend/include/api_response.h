@@ -75,8 +75,20 @@ void api_build_error_response(ApiResponseBuffer *buf,
                               const char *error_message,
                               const char *origin_header);
 
+/**
+ * @brief Build a full HTTP response with custom Content-Type and raw binary or text data.
+ */
+void api_build_raw_http_response(ApiResponseBuffer *buf,
+                                 int status_code,
+                                 const char *status_text,
+                                 const char *content_type,
+                                 const char *payload_data,
+                                 size_t payload_len,
+                                 const char *origin_header);
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* DATAVAULT_API_RESPONSE_H */
+

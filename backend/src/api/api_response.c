@@ -164,7 +164,8 @@ void api_build_error_response(ApiResponseBuffer *buf,
                               const char *error_message,
                               const char *origin_header) {
     const char *status_text = "Bad Request";
-    if (http_status == 404) status_text = "Not Found";
+    if (http_status == 403) status_text = "Forbidden";
+    else if (http_status == 404) status_text = "Not Found";
     else if (http_status == 405) status_text = "Method Not Allowed";
     else if (http_status == 500) status_text = "Internal Server Error";
 
@@ -177,5 +178,55 @@ void api_build_error_response(ApiResponseBuffer *buf,
 
     api_build_http_response(buf, http_status, status_text, json_buf.data, origin_header);
     api_buffer_free(&json_buf);
+}
+
+void api_build_raw_http_response(ApiResponseBuffer *buf,
+                                 int status_code,
+                                 const char *status_text,
+                                 const char *content_type,
+                                 const char *payload_data,
+                                 size_t payload_len,
+                                 const char *origin_header) {
+    if (!buf) return;
+    api_buffer_init(buf);
+
+    /* Status line */
+    api_buffer_append_printf(buf, "HTTP/1.1 %d %s\r\n", status_code, status_text ? status_text : "OK");
+
+    /* Standard headers */
+    api_buffer_append_printf(buf, "Content-Type: %s\r\n", content_type ? content_type : "text/plain");
+    api_buffer_append_printf(buf, "Content-Length: %zu\r\n", payload_len);
+    api_buffer_append(buf, "Connection: close\r\n");
+    api_buffer_append(buf, "Server: DUPLICATE-X/1.0 (DataVault C11 Engine)\r\n");
+
+    /* Local CORS support if origin header provided and allowed */
+    if (origin_header && strlen(origin_header) > 0) {
+        api_buffer_append_printf(buf, "Access-Control-Allow-Origin: %s\r\n", origin_header);
+        api_buffer_append(buf, "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n");
+        api_buffer_append(buf, "Access-Control-Allow-Headers: Content-Type\r\n");
+    }
+
+    /* End of HTTP headers */
+    api_buffer_append(buf, "\r\n");
+
+    /* Payload data */
+    if (payload_data && payload_len > 0) {
+        /* Need to append exact binary/text buffer */
+        size_t needed = buf->length + payload_len + 1;
+        if (needed > buf->capacity) {
+            size_t new_cap = (buf->capacity == 0) ? 1024 : buf->capacity * 2;
+            while (new_cap < needed) new_cap *= 2;
+            char *new_data = (char *)realloc(buf->data, new_cap);
+            if (new_data) {
+                buf->data = new_data;
+                buf->capacity = new_cap;
+            }
+        }
+        if (buf->data && buf->capacity >= needed) {
+            memcpy(buf->data + buf->length, payload_data, payload_len);
+            buf->length += payload_len;
+            buf->data[buf->length] = '\0';
+        }
+    }
 }
 

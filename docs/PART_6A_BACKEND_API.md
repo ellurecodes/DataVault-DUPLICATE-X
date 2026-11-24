@@ -210,3 +210,4 @@ powershell -ExecutionPolicy Bypass -File scripts/test_api.ps1
 
 **Q15: Why is synchronous scan execution acceptable in Part 6A?**  
 *Answer:* In Part 6A, synchronous execution keeps the architecture deterministic and straightforward without multithreading race conditions on `FileInventory`. The API contract allows background asynchronous tasks to be added seamlessly in future phases without breaking the JSON schema.
+
