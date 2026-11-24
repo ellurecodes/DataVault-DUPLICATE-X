@@ -44,8 +44,33 @@
         </div>
     </header>
 
+    <!-- Sub-Header Navigation Tabs -->
+    <nav class="app-nav">
+        <div class="nav-container">
+            <button id="navTabDuplicates" class="nav-tab active">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Duplicate Management</span>
+            </button>
+            <button id="navTabQuarantine" class="nav-tab">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+                <span>Quarantine &amp; Recovery</span>
+                <span id="navQuarantineCount" class="nav-badge" style="display: none;">0</span>
+            </button>
+        </div>
+    </nav>
+
     <!-- Main Content Container -->
     <main class="main-container">
+
+        <!-- ============================================================== -->
+        <!-- VIEW 1: DUPLICATE MANAGEMENT & DETECTION                       -->
+        <!-- ============================================================== -->
+        <div id="viewDuplicates" class="view-panel active">
 
         <!-- 4 Summary Telemetry Cards -->
         <section class="metrics-grid">
@@ -268,7 +293,243 @@
                 <div class="empty-state">Enter a directory path prefix to query the Trie index.</div>
             </div>
         </section>
+        </div><!-- End viewDuplicates -->
+
+        <!-- ============================================================== -->
+        <!-- VIEW 2: QUARANTINE & RESTORE DASHBOARD                         -->
+        <!-- ============================================================== -->
+        <div id="viewQuarantine" class="view-panel" style="display: none;">
+            
+            <!-- Quarantine Safety & Architecture Info Banner -->
+            <div class="info-banner">
+                <svg class="info-banner-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    <path d="M12 8v4"></path>
+                    <path d="M12 16h.01"></path>
+                </svg>
+                <div class="info-banner-text">
+                    <strong>Safe Volume-Local Quarantine Architecture:</strong> Files relocated to quarantine are placed into a hidden <code>.datavault_quarantine</code> directory on the <em>identical storage volume</em> using atomic Win32 <code>MoveFileExW</code> metadata pointers. No files are permanently deleted. Cryptographic SHA-256 fingerprints and write-ahead transaction logs ensure 100% data integrity and effortless single-click recovery.
+                </div>
+            </div>
+
+            <!-- Quarantine Statistics Grid -->
+            <div class="quarantine-stats-grid">
+                <div class="q-stat-card">
+                    <div class="q-stat-label">Total Transactions</div>
+                    <div id="qStatTotal" class="q-stat-val">0</div>
+                </div>
+                <div class="q-stat-card">
+                    <div class="q-stat-label">Active in Quarantine</div>
+                    <div id="qStatActive" class="q-stat-val" style="color: var(--accent-green);">0</div>
+                </div>
+                <div class="q-stat-card">
+                    <div class="q-stat-label">Safely Restored</div>
+                    <div id="qStatRestored" class="q-stat-val" style="color: var(--accent-blue);">0</div>
+                </div>
+                <div class="q-stat-card">
+                    <div class="q-stat-label">Reconciled / Failed</div>
+                    <div id="qStatFailed" class="q-stat-val" style="color: var(--accent-amber);">0</div>
+                </div>
+            </div>
+
+            <!-- Quarantine Transaction History -->
+            <section class="dashboard-section card">
+                <div class="section-header">
+                    <div>
+                        <h2 class="section-title">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 14 14"></polyline>
+                            </svg>
+                            Quarantine Transaction History
+                        </h2>
+                        <p class="section-desc">Persistent transaction log loaded directly from the C backend <code>quarantine_manifest.json</code>.</p>
+                    </div>
+                    <span class="tag tag-green">Write-Ahead Journaled</span>
+                </div>
+
+                <!-- History Toolbar: Search, Status Filters, Refresh -->
+                <div class="quarantine-toolbar">
+                    <div class="input-icon-wrapper" style="max-width: 360px; flex: 1;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="quarantineSearchInput" class="form-input" placeholder="Search by filename, path, SHA-256 or TX ID...">
+                    </div>
+
+                    <div class="filter-pills" id="quarantineStatusFilters">
+                        <button class="filter-pill active" data-status="ALL">All (<span id="qCountAll">0</span>)</button>
+                        <button class="filter-pill" data-status="ACTIVE">Active (<span id="qCountActive">0</span>)</button>
+                        <button class="filter-pill" data-status="RESTORED">Restored (<span id="qCountRestored">0</span>)</button>
+                        <button class="filter-pill" data-status="FAILED">Failed (<span id="qCountFailed">0</span>)</button>
+                    </div>
+
+                    <button id="btnRefreshHistory" class="btn btn-secondary btn-icon" title="Refresh Manifest from Server">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        <span>Refresh History</span>
+                    </button>
+                </div>
+
+                <!-- History Table Container -->
+                <div id="quarantineTableContainer" class="quarantine-table-wrap">
+                    <div class="empty-state">Loading quarantine records from server...</div>
+                </div>
+            </section>
+        </div><!-- End viewQuarantine -->
     </main>
+
+    <!-- ============================================================== -->
+    <!-- MODAL: STAGE 1 & 2 QUARANTINE CONFIRMATION                     -->
+    <!-- ============================================================== -->
+    <div id="quarantineModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    Confirm File Quarantine (Stage 1 of 2)
+                </div>
+                <button id="btnCloseQuarantineModal" class="modal-close" title="Cancel">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Safety Warning -->
+                <div class="modal-alert modal-alert-warning">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        <polyline points="9 12 12 15 15 9"></polyline>
+                    </svg>
+                    <div>
+                        <strong>Non-Destructive Relocation:</strong> The selected file(s) will be relocated into the hidden <code>.datavault_quarantine</code> directory on the same volume. No files are permanently deleted, and one valid copy is guaranteed to remain safe.
+                    </div>
+                </div>
+
+                <!-- Preview Telemetry Grid -->
+                <div class="modal-meta-grid">
+                    <div class="modal-meta-item">
+                        <span class="modal-meta-label">Duplicate Group</span>
+                        <span id="qModalGroupId" class="modal-meta-val">GRP #--</span>
+                    </div>
+                    <div class="modal-meta-item">
+                        <span class="modal-meta-label">Copies Remaining Safe</span>
+                        <span id="qModalRemaining" class="modal-meta-val" style="color: var(--accent-green);">1 valid copy</span>
+                    </div>
+                    <div class="modal-meta-item">
+                        <span class="modal-meta-label">Recoverable Storage</span>
+                        <span id="qModalRecoverable" class="modal-meta-val" style="color: var(--accent-cyan);">0 B</span>
+                    </div>
+                    <div class="modal-meta-item">
+                        <span class="modal-meta-label">Preview Token Expiration</span>
+                        <span id="qModalExpiry" class="modal-meta-val" style="color: var(--accent-amber);">300s remaining</span>
+                    </div>
+                </div>
+
+                <!-- Files Selected List -->
+                <div>
+                    <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">
+                        Selected File(s) to Quarantine (<span id="qModalFileCount">0</span>):
+                    </div>
+                    <div id="qModalFileList" class="modal-file-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Error Container -->
+                <div id="qModalError" class="modal-alert modal-alert-danger" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="btnCancelQuarantine" class="btn btn-secondary">Cancel</button>
+                <button id="btnConfirmQuarantine" class="btn btn-danger">
+                    <span id="btnConfirmQuarantineText">Confirm &amp; Quarantine</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- MODAL: STAGE 1 & 2 RESTORE CONFIRMATION                       -->
+    <!-- ============================================================== -->
+    <div id="restoreModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                    Confirm File Restoration (Stage 1 of 2)
+                </div>
+                <button id="btnCloseRestoreModal" class="modal-close" title="Cancel">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Info / Conflict Alert -->
+                <div id="restoreConflictAlert" class="modal-alert modal-alert-danger" style="display: none;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                    <div id="restoreConflictMsg">
+                        <strong>Destination Conflict:</strong> A file already exists at the original location. The C engine strictly prevents overwriting existing files.
+                    </div>
+                </div>
+
+                <div id="restoreInfoAlert" class="modal-alert modal-alert-info">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <div>
+                        <strong>Integrity Verified:</strong> Quarantined file cryptographic SHA-256 fingerprint verified untampered. File will be safely moved back to its original location.
+                    </div>
+                </div>
+
+                <!-- Restore Metadata Grid -->
+                <div class="modal-meta-grid">
+                    <div class="modal-meta-item">
+                        <span class="modal-meta-label">Transaction ID</span>
+                        <span id="rModalTxId" class="modal-meta-val tx-chip">tx_--</span>
+                    </div>
+                    <div class="modal-meta-item">
+                        <span class="modal-meta-label">File Size</span>
+                        <span id="rModalFileSize" class="modal-meta-val">0 B</span>
+                    </div>
+                    <div class="modal-meta-item" style="grid-column: span 2;">
+                        <span class="modal-meta-label">Original Restore Path</span>
+                        <span id="rModalOrigPath" class="modal-meta-val" style="word-break: break-all; font-size: 0.82rem; font-family: var(--font-mono); color: var(--accent-cyan);">--</span>
+                    </div>
+                </div>
+
+                <!-- Error Container -->
+                <div id="rModalError" class="modal-alert modal-alert-danger" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="btnCancelRestore" class="btn btn-secondary">Cancel</button>
+                <button id="btnConfirmRestore" class="btn btn-primary">
+                    <span id="btnConfirmRestoreText">Confirm &amp; Restore</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
 
     <!-- Global Application Footer -->
     <footer class="app-footer">

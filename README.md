@@ -135,6 +135,9 @@ powershell -ExecutionPolicy Bypass -File scripts/test_api.ps1
 
 # Part 7A Safe Quarantine & File Recovery Verification
 powershell -ExecutionPolicy Bypass -File scripts/test_quarantine.ps1
+
+# Part 7B Frontend Quarantine & Restore Verification
+powershell -ExecutionPolicy Bypass -File scripts/test_frontend_quarantine.ps1
 ```
 *Note on Windows 11 Smart App Control (SAC):* If Smart App Control is enabled in Enforcement Mode (`VerifiedAndReputablePolicyState = 1`), execution of newly compiled unsigned native binaries may be intercepted by host Code Integrity policies. The test scripts detect this condition and report diagnostic information. Complete test execution is verified on GitHub-hosted Windows runners.
 
@@ -151,7 +154,7 @@ A standardized Windows CI workflow is provided at `.github/workflows/windows-tes
      - Part 4 (12 tests): Hash Table Separate Chaining & Linked List Grouping.
      - Part 5A (15 tests): Binary Min Heap & Top K Storage Waste.
      - Part 5B (18 tests): Prefix Trie & Path Sub-Tree Search.
-     - Part 6A/6B (18 tests): Winsock2 REST API & Static Asset File Serving.
+     - Part 6A/6B (22 tests): Winsock2 REST API & Static Asset File Serving.
      - Part 7A (25 tests): Safe Quarantine Engine, Write-Ahead Journal, Crash Recovery & Restoration.
    - Executes `duplicate-x.exe --help` CLI smoke test.
 
@@ -166,7 +169,7 @@ A standardized Windows CI workflow is provided at `.github/workflows/windows-tes
 | **Data Structures Formal Spec** | Completed | `DATA_STRUCTURES.md` with Hash Table, Linked List, Heap, Trie, Graph. |
 | **Project Scaffolding** | Completed | Clean modular directory structure (`backend/`, `frontend/`, `scripts/`). |
 | **Initial C11 Foundation** | Completed | `config.h`, `status.h`, `engine.h`, `engine.c`, `main.c`. |
-| **Build & Run Automation** | Completed | `scripts/build.ps1`, `scripts/run.ps1`, `scripts/test.ps1`, `scripts/test_api.ps1`, `scripts/test_quarantine.ps1`. |
+| **Build & Run Automation** | Completed | `scripts/build.ps1`, `scripts/run.ps1`, `scripts/test.ps1`, `scripts/test_api.ps1`, `scripts/test_quarantine.ps1`, `scripts/test_frontend_quarantine.ps1`. |
 | **File Scanner Module** | Completed | Recursive Unicode traversal (`win_file_scanner.c`), dynamic `FileInventory`. |
 | **SHA-256 Engine (BCrypt)** | Completed | Windows BCrypt 64KB chunk streaming (`win_crypto.c`) with modification safety checks. |
 | **Part 4: Custom Hash Table** | Completed | Separate chaining, prime capacities, dynamic resizing at $\alpha > 0.75$, 64-bit FNV-1a. |
@@ -177,6 +180,7 @@ A standardized Windows CI workflow is provided at `.github/workflows/windows-tes
 | **Part 5A: Binary Min Heap** | Verified (15/15 Passed) | Custom Min Heap, Top K storage ranking ($O(N \log K)$), verified on GitHub Actions. |
 | **Part 5B: Prefix Trie** | Verified (18/18 Passed) | Custom Prefix Trie, sub-tree path search ($O(L)$), verified on GitHub Actions. |
 | **Part 6A: Local C REST API** | Verified (15/15 Passed) | Pure C Winsock2 HTTP/1.1 REST API, JSON serialization, loopback binding. |
-| **Part 6B: Frontend Dashboard** | Completed & Verified | HTML5/CSS3/Vanilla JS dark navy UI, static file routing, path traversal protection (18/18 tests). |
+| **Part 6B: Frontend Dashboard** | Completed & Verified | HTML5/CSS3/Vanilla JS dark navy UI, static file routing, path traversal protection (22/22 tests). |
 | **Part 7A: Safe Quarantine & Recovery** | Completed & Verified (25/25 Passed) | Same-volume `MoveFileExW` vault, sole-copy protection, 2-stage BCrypt tokens, write-ahead journaling & crash reconciliation. |
+| **Part 7B: Frontend Quarantine Dashboard** | Completed & Verified (20/20 Checks) | Tabbed navigation, redundant copy selection, 2-stage preview/confirm modals, manifest history filters, anti-overwrite restore dialogs. |
 

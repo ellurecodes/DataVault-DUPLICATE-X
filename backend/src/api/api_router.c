@@ -422,6 +422,8 @@ static void handle_duplicates(ApiEngineContext *ctx, const ApiHttpRequest *req, 
             if (file_idx > 0) api_buffer_append(&json, ",\n");
             const FileRecord *r = node->record;
             api_buffer_append(&json, "        {\n");
+            api_buffer_append_printf(&json, "          \"file_id\": %llu,\n", (unsigned long long)r->record_id);
+            api_buffer_append_printf(&json, "          \"file_size\": %llu,\n", (unsigned long long)r->file_size);
             api_buffer_append(&json, "          \"filename\": ");
             api_buffer_append_escaped_json(&json, r->filename ? r->filename : "");
             api_buffer_append(&json, ",\n          \"filepath\": ");

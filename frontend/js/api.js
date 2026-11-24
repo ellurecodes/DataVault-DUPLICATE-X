@@ -26,10 +26,13 @@ const DuplicateXApi = {
             const data = isJson ? await response.json() : await response.text();
 
             if (!response.ok) {
-                const errorMsg = (typeof data === 'object' && data.error) 
-                    ? data.error 
-                    : `HTTP ${response.status} ${response.statusText}`;
-                throw new Error(errorMsg);
+                const errorMsg = (typeof data === 'object' && (data.error || data.message)) 
+                    ? (data.error || data.message)
+                    : (typeof data === 'string' && data.length > 0 ? data : `HTTP ${response.status} ${response.statusText}`);
+                const err = new Error(errorMsg);
+                err.status = response.status;
+                err.data = data;
+                throw err;
             }
 
             return data;
@@ -90,6 +93,81 @@ const DuplicateXApi = {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ directories })
+        });
+    },
+
+    /**
+     * Request a quarantine preview for selected files in a duplicate group (Stage 1)
+     * POST /api/quarantine/preview
+     */
+    async quarantinePreview(groupId, fileIds) {
+        return await this._request('/api/quarantine/preview', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                group_id: Number(groupId),
+                file_ids: fileIds.map(Number)
+            })
+        });
+    },
+
+    /**
+     * Execute confirmed quarantine relocation using a valid preview token (Stage 2)
+     * POST /api/quarantine/execute
+     */
+    async quarantineExecute(previewId, confirmation = 'QUARANTINE') {
+        return await this._request('/api/quarantine/execute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                preview_id: String(previewId),
+                confirmation: String(confirmation)
+            })
+        });
+    },
+
+    /**
+     * Fetch persistent quarantine transaction history manifest
+     * GET /api/quarantine/history
+     */
+    async getQuarantineHistory() {
+        return await this._request('/api/quarantine/history');
+    },
+
+    /**
+     * Request a restoration preview for a quarantined transaction (Stage 1)
+     * POST /api/quarantine/restore/preview
+     */
+    async restorePreview(transactionId) {
+        return await this._request('/api/quarantine/restore/preview', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                transaction_id: String(transactionId)
+            })
+        });
+    },
+
+    /**
+     * Execute confirmed restoration using a valid preview token (Stage 2)
+     * POST /api/quarantine/restore/execute
+     */
+    async restoreExecute(previewId, confirmation = 'RESTORE') {
+        return await this._request('/api/quarantine/restore/execute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                preview_id: String(previewId),
+                confirmation: String(confirmation)
+            })
         });
     }
 };

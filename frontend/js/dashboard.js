@@ -236,9 +236,21 @@ const DashboardUI = {
     },
 
     /**
+     * Format timestamp to readable date/time
+     */
+    formatDate(epochSeconds) {
+        if (!epochSeconds || epochSeconds <= 0) return '--';
+        try {
+            return new Date(Number(epochSeconds) * 1000).toLocaleString();
+        } catch (e) {
+            return '--';
+        }
+    },
+
+    /**
      * Render Duplicate File Explorer groups in an expandable accordion
      */
-    renderDuplicates(groups, filterText = '') {
+    renderDuplicates(groups, filterText = '', onQuarantineClick = null) {
         const container = document.getElementById('duplicatesAccordion');
         const countGroupsEl = document.getElementById('displayedGroupsCount');
         const countCopiesEl = document.getElementById('displayedCopiesCount');
@@ -303,15 +315,49 @@ const DashboardUI = {
                 card.classList.toggle('open');
             });
 
-            // Accordion Content (Table of files in group)
+            // Accordion Content (Table of files in group + selection action bar)
             const content = document.createElement('div');
             content.className = 'accordion-content';
 
+            // Group Action Toolbar for Quarantine Selection
+            const actionBar = document.createElement('div');
+            actionBar.className = 'group-action-bar';
+            actionBar.innerHTML = `
+                <div class="group-action-left">
+                    <span class="selection-summary">
+                        Selected: <strong class="sel-count">0</strong> redundant copies (<strong class="sel-bytes">0 B</strong>)
+                    </span>
+                    <button type="button" class="btn-link btn-select-redundant">Select Redundant</button>
+                    <button type="button" class="btn-link btn-clear-selection" style="display: none;">Clear</button>
+                </div>
+                <div class="group-action-right">
+                    <span style="font-size: 0.74rem; color: var(--text-muted);">1 valid original copy must remain</span>
+                    <button type="button" class="btn btn-danger btn-quarantine-submit" disabled>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            <path d="M12 8v4"></path>
+                            <path d="M12 16h.01"></path>
+                        </svg>
+                        Quarantine Selected
+                    </button>
+                </div>
+            `;
+            content.appendChild(actionBar);
+
+            const selCountEl = actionBar.querySelector('.sel-count');
+            const selBytesEl = actionBar.querySelector('.sel-bytes');
+            const btnQuarantine = actionBar.querySelector('.btn-quarantine-submit');
+            const btnSelectAll = actionBar.querySelector('.btn-select-redundant');
+            const btnClear = actionBar.querySelector('.btn-clear-selection');
+
+            // Table of Files in Group
+            const tableWrap = document.createElement('div');
             let tableHtml = `
                 <table class="file-table">
                     <thead>
                         <tr>
-                            <th style="width: 100px;">Status</th>
+                            <th style="width: 44px; text-align: center;">Select</th>
+                            <th style="width: 120px;">Role</th>
                             <th style="width: 110px;">Device / Volume</th>
                             <th>Filename &amp; Path</th>
                             <th style="width: 100px; text-align: right;">Size</th>
@@ -322,11 +368,23 @@ const DashboardUI = {
 
             (grp.files || []).forEach((f, fileIdx) => {
                 const isOriginal = fileIdx === 0;
+                const fileId = f.file_id !== undefined ? f.file_id : (fileIdx + 1);
+                const fileSize = Number(f.file_size || 0);
+
                 tableHtml += `
                     <tr>
+                        <td style="text-align: center;">
+                            <input type="checkbox" class="file-cb group-file-cb" 
+                                   data-group-id="${this.escapeHtml(grp.group_id)}"
+                                   data-file-id="${this.escapeHtml(fileId)}"
+                                   data-size="${fileSize}"
+                                   data-path="${this.escapeHtml(f.filepath || '')}"
+                                   data-name="${this.escapeHtml(f.filename || '')}"
+                                   ${isOriginal ? 'disabled title="Original root copy: must remain safe"' : 'title="Select redundant copy for quarantine"'}>
+                        </td>
                         <td>
                             <span class="file-role-badge ${isOriginal ? 'role-original' : 'role-duplicate'}">
-                                ${isOriginal ? 'Original / Keep' : 'Duplicate'}
+                                ${isOriginal ? 'Root / Keep' : 'Duplicate'}
                             </span>
                         </td>
                         <td><strong>${this.escapeHtml(f.device_id || 'Local')}</strong></td>
@@ -334,7 +392,7 @@ const DashboardUI = {
                             <div style="font-weight: 600;">${this.escapeHtml(f.filename || '')}</div>
                             <div class="file-path-cell">${this.escapeHtml(f.filepath || '')}</div>
                         </td>
-                        <td style="text-align: right; font-weight: 600;">${this.formatBytes(f.file_size)}</td>
+                        <td style="text-align: right; font-weight: 600;">${this.formatBytes(fileSize)}</td>
                     </tr>
                 `;
             });
@@ -343,13 +401,249 @@ const DashboardUI = {
                     </tbody>
                 </table>
             `;
+            tableWrap.innerHTML = tableHtml;
+            content.appendChild(tableWrap);
 
-            content.innerHTML = tableHtml;
+            // Selection Event Handling for this Group
+            const checkboxes = content.querySelectorAll('.group-file-cb:not(:disabled)');
+
+            function updateGroupSelection() {
+                let selectedCount = 0;
+                let selectedBytes = 0;
+                const selectedIds = [];
+                const selectedFiles = [];
+
+                checkboxes.forEach(cb => {
+                    if (cb.checked) {
+                        selectedCount++;
+                        selectedBytes += Number(cb.dataset.size || 0);
+                        selectedIds.push(Number(cb.dataset.fileId));
+                        selectedFiles.push({
+                            file_id: Number(cb.dataset.fileId),
+                            filepath: cb.dataset.path,
+                            filename: cb.dataset.name,
+                            file_size: Number(cb.dataset.size || 0)
+                        });
+                    }
+                });
+
+                if (selCountEl) selCountEl.textContent = DashboardUI.formatNumber(selectedCount);
+                if (selBytesEl) selBytesEl.textContent = DashboardUI.formatBytes(selectedBytes);
+
+                if (btnClear) btnClear.style.display = selectedCount > 0 ? 'inline-block' : 'none';
+
+                // Invariant: At least 1 copy must remain, and at least 1 must be selected
+                const totalInGroup = grp.files ? grp.files.length : 0;
+                const remaining = totalInGroup - selectedCount;
+                const isValid = (selectedCount > 0 && remaining >= 1);
+
+                if (btnQuarantine) {
+                    btnQuarantine.disabled = !isValid;
+                    if (remaining < 1 && selectedCount > 0) {
+                        btnQuarantine.title = 'Cannot quarantine all copies: at least 1 copy must remain';
+                    } else if (selectedCount === 0) {
+                        btnQuarantine.title = 'Select at least one duplicate file to quarantine';
+                    } else {
+                        btnQuarantine.title = `Quarantine ${selectedCount} selected duplicate copy(ies)`;
+                    }
+                }
+
+                return { selectedIds, selectedFiles, selectedBytes, remaining };
+            }
+
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', updateGroupSelection);
+            });
+
+            if (btnSelectAll) {
+                btnSelectAll.addEventListener('click', () => {
+                    checkboxes.forEach(cb => { cb.checked = true; });
+                    updateGroupSelection();
+                });
+            }
+
+            if (btnClear) {
+                btnClear.addEventListener('click', () => {
+                    checkboxes.forEach(cb => { cb.checked = false; });
+                    updateGroupSelection();
+                });
+            }
+
+            if (btnQuarantine && onQuarantineClick) {
+                btnQuarantine.addEventListener('click', () => {
+                    const sel = updateGroupSelection();
+                    if (sel.selectedIds.length > 0 && sel.remaining >= 1) {
+                        onQuarantineClick(grp.group_id, sel.selectedIds, sel.selectedFiles, grp);
+                    }
+                });
+            }
+
             card.appendChild(header);
             card.appendChild(content);
             container.appendChild(card);
         });
     },
+
+    /**
+     * Render Quarantine Transaction History Table
+     */
+    renderQuarantineHistory(records, filterStatus = 'ALL', searchQuery = '', onRestoreClick = null) {
+        const container = document.getElementById('quarantineTableContainer');
+        const qStatTotal = document.getElementById('qStatTotal');
+        const qStatActive = document.getElementById('qStatActive');
+        const qStatRestored = document.getElementById('qStatRestored');
+        const qStatFailed = document.getElementById('qStatFailed');
+
+        const qCountAll = document.getElementById('qCountAll');
+        const qCountActive = document.getElementById('qCountActive');
+        const qCountRestored = document.getElementById('qCountRestored');
+        const qCountFailed = document.getElementById('qCountFailed');
+        const navQuarantineCount = document.getElementById('navQuarantineCount');
+
+        const allRecords = records || [];
+
+        // Count metrics across all records
+        const countTotal = allRecords.length;
+        const countActive = allRecords.filter(r => r.status === 'ACTIVE').length;
+        const countRestored = allRecords.filter(r => r.status === 'RESTORED').length;
+        const countFailed = allRecords.filter(r => r.status === 'FAILED').length;
+
+        if (qStatTotal) qStatTotal.textContent = this.formatNumber(countTotal);
+        if (qStatActive) qStatActive.textContent = this.formatNumber(countActive);
+        if (qStatRestored) qStatRestored.textContent = this.formatNumber(countRestored);
+        if (qStatFailed) qStatFailed.textContent = this.formatNumber(countFailed);
+
+        if (qCountAll) qCountAll.textContent = this.formatNumber(countTotal);
+        if (qCountActive) qCountActive.textContent = this.formatNumber(countActive);
+        if (qCountRestored) qCountRestored.textContent = this.formatNumber(countRestored);
+        if (qCountFailed) qCountFailed.textContent = this.formatNumber(countFailed);
+
+        // Update navigation tab badge
+        if (navQuarantineCount) {
+            navQuarantineCount.textContent = this.formatNumber(countActive);
+            navQuarantineCount.style.display = countActive > 0 ? 'inline-block' : 'none';
+        }
+
+        if (!container) return;
+
+        // Apply filters
+        const q = searchQuery.trim().toLowerCase();
+        const filtered = allRecords.filter(r => {
+            // Status filter
+            if (filterStatus !== 'ALL' && r.status !== filterStatus) return false;
+            // Search filter
+            if (q) {
+                const fn = (r.original_filename || '').toLowerCase();
+                const op = (r.original_path || '').toLowerCase();
+                const qp = (r.quarantine_path || '').toLowerCase();
+                const tx = (r.transaction_id || '').toLowerCase();
+                const sh = (r.sha256_hex || '').toLowerCase();
+                if (!fn.includes(q) && !op.includes(q) && !qp.includes(q) && !tx.includes(q) && !sh.includes(q)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        if (filtered.length === 0) {
+            container.innerHTML = (q || filterStatus !== 'ALL')
+                ? `<div class="empty-state">No quarantine transactions match current filter/search.</div>`
+                : `<div class="empty-state">No files have been quarantined yet. In Duplicate Management, select files and click "Quarantine Selected".</div>`;
+            return;
+        }
+
+        let tableHtml = `
+            <table class="file-table">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">Status</th>
+                        <th style="width: 130px;">Transaction ID</th>
+                        <th>Original Filename &amp; Path</th>
+                        <th>Quarantine Location</th>
+                        <th style="width: 85px; text-align: right;">Size</th>
+                        <th style="width: 140px;">Quarantine Date</th>
+                        <th style="width: 100px; text-align: center;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        filtered.forEach(r => {
+            const statusClass = (r.status === 'ACTIVE') ? 'badge-active' :
+                                (r.status === 'RESTORED') ? 'badge-restored' : 'badge-failed';
+            const isActive = (r.status === 'ACTIVE');
+
+            tableHtml += `
+                <tr>
+                    <td><span class="status-badge ${statusClass}">${this.escapeHtml(r.status)}</span></td>
+                    <td><span class="tx-chip" title="${this.escapeHtml(r.transaction_id)}">${this.truncateHash(r.transaction_id)}</span></td>
+                    <td>
+                        <div style="font-weight: 600;">${this.escapeHtml(r.original_filename || '')}</div>
+                        <div class="file-path-cell" title="${this.escapeHtml(r.original_path || '')}">${this.escapeHtml(r.original_path || '')}</div>
+                    </td>
+                    <td>
+                        <div class="file-path-cell" title="${this.escapeHtml(r.quarantine_path || '')}">${this.escapeHtml(r.quarantine_path || '')}</div>
+                    </td>
+                    <td style="text-align: right; font-weight: 600;">${this.formatBytes(r.file_size)}</td>
+                    <td style="font-size: 0.76rem; color: var(--text-secondary);">${this.formatDate(r.quarantine_timestamp)}</td>
+                    <td style="text-align: center;">
+                        ${isActive ? `
+                            <button class="btn btn-secondary btn-sm btn-restore-tx" data-tx="${this.escapeHtml(r.transaction_id)}" title="Safely restore this file to original location">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                                </svg>
+                                Restore
+                            </button>
+                        ` : `
+                            <span style="color: var(--text-muted); font-size: 0.78rem;">${r.status === 'RESTORED' ? 'Restored' : '--'}</span>
+                        `}
+                    </td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+
+        container.innerHTML = tableHtml;
+
+        // Attach restore button click listeners
+        if (onRestoreClick) {
+            container.querySelectorAll('.btn-restore-tx').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const txId = e.currentTarget.dataset.tx;
+                    if (txId) onRestoreClick(txId);
+                });
+            });
+        }
+    },
+
+    /**
+     * Show non-intrusive toast notification
+     */
+    showToast(title, message, type = 'info', duration = 4000) {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <div style="flex: 1;">
+                <div class="toast-title">${this.escapeHtml(title)}</div>
+                <div class="toast-msg">${this.escapeHtml(message)}</div>
+            </div>
+        `;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => { if (toast.parentNode) toast.remove(); }, 300);
+        }, duration);
+    }
 
     /**
      * Render Prefix Trie Search Results

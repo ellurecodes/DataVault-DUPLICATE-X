@@ -134,7 +134,7 @@ jobs:
             -lbcrypt -lws2_32
           ls -l backend/build/test_api.exe
 
-      - name: Execute Part 6A/6B 18-Scenario REST API & Frontend Serving Test Suite
+      - name: Execute Part 6A/6B 22-Scenario REST API & Frontend Serving Test Suite
         shell: msys2 {0}
         run: |
           ./backend/build/test_api.exe

@@ -316,7 +316,7 @@ int main(void) {
     /* ----------------------------------------------------
      * TEST 18: Directory traversal attempt is blocked with HTTP 403
      * ---------------------------------------------------- */
-    printf("[TEST 18/18] Path traversal (/../secret.txt) returns HTTP 403... ");
+    printf("[TEST 18/22] Path traversal (/../secret.txt) returns HTTP 403... ");
     ApiHttpRequest req18;
     ApiResponseBuffer resp18;
     api_buffer_init(&resp18);
@@ -327,10 +327,69 @@ int main(void) {
     api_buffer_free(&resp18);
     printf("PASS (directory traversal blocked with HTTP 403)\n");
 
+    /* ----------------------------------------------------
+     * TEST 19: GET /api/quarantine/history returns HTTP 200 JSON
+     * ---------------------------------------------------- */
+    printf("[TEST 19/22] GET /api/quarantine/history returns HTTP 200... ");
+    ApiHttpRequest req19;
+    ApiResponseBuffer resp19;
+    api_buffer_init(&resp19);
+    const char *raw19 = "GET /api/quarantine/history HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n\r\n";
+    api_parse_http_request(raw19, strlen(raw19), &req19);
+    api_route_request(&ctx, &req19, &resp19);
+    assert(strstr(resp19.data, "HTTP/1.1 200 OK") != NULL);
+    assert(strstr(resp19.data, "\"records\":") != NULL);
+    api_buffer_free(&resp19);
+    printf("PASS (quarantine manifest JSON returned successfully)\n");
+
+    /* ----------------------------------------------------
+     * TEST 20: POST /api/quarantine/preview missing body returns HTTP 400
+     * ---------------------------------------------------- */
+    printf("[TEST 20/22] POST /api/quarantine/preview missing body returns HTTP 400... ");
+    ApiHttpRequest req20;
+    ApiResponseBuffer resp20;
+    api_buffer_init(&resp20);
+    const char *raw20 = "POST /api/quarantine/preview HTTP/1.1\r\nHost: 127.0.0.1:8080\r\nContent-Length: 0\r\n\r\n";
+    api_parse_http_request(raw20, strlen(raw20), &req20);
+    api_route_request(&ctx, &req20, &resp20);
+    assert(strstr(resp20.data, "HTTP/1.1 400 Bad Request") != NULL);
+    api_buffer_free(&resp20);
+    printf("PASS (empty preview request rejected safely with HTTP 400)\n");
+
+    /* ----------------------------------------------------
+     * TEST 21: GET /js/app.js serves JavaScript asset (HTTP 200)
+     * ---------------------------------------------------- */
+    printf("[TEST 21/22] GET /js/app.js serves JavaScript file (HTTP 200)... ");
+    ApiHttpRequest req21;
+    ApiResponseBuffer resp21;
+    api_buffer_init(&resp21);
+    const char *raw21 = "GET /js/app.js HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n\r\n";
+    api_parse_http_request(raw21, strlen(raw21), &req21);
+    api_route_request(&ctx, &req21, &resp21);
+    assert(strstr(resp21.data, "HTTP/1.1 200 OK") != NULL);
+    assert(strstr(resp21.data, "Content-Type: application/javascript") != NULL);
+    api_buffer_free(&resp21);
+    printf("PASS (app.js served with application/javascript)\n");
+
+    /* ----------------------------------------------------
+     * TEST 22: GET /js/dashboard.js serves JavaScript file (HTTP 200)
+     * ---------------------------------------------------- */
+    printf("[TEST 22/22] GET /js/dashboard.js serves JavaScript file (HTTP 200)... ");
+    ApiHttpRequest req22;
+    ApiResponseBuffer resp22;
+    api_buffer_init(&resp22);
+    const char *raw22 = "GET /js/dashboard.js HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n\r\n";
+    api_parse_http_request(raw22, strlen(raw22), &req22);
+    api_route_request(&ctx, &req22, &resp22);
+    assert(strstr(resp22.data, "HTTP/1.1 200 OK") != NULL);
+    assert(strstr(resp22.data, "Content-Type: application/javascript") != NULL);
+    api_buffer_free(&resp22);
+    printf("PASS (dashboard.js served with application/javascript)\n");
+
     api_engine_context_cleanup(&ctx);
 
     printf("\n====================================================\n");
-    printf(" ALL 18 REST API & FRONTEND SERVING TESTS PASSED WITH 100%% SUCCESS!\n");
+    printf(" ALL 22 REST API & FRONTEND SERVING TESTS PASSED WITH 100%% SUCCESS!\n");
     printf("====================================================\n");
 
     return EXIT_SUCCESS;

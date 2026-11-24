@@ -389,3 +389,4 @@ The Part 7A test harness (`backend/tests/test_quarantine.c`) validates every bou
 3. `GET /api/quarantine/history` — Returns full transaction log with current statuses.
 4. `POST /api/quarantine/restore/preview` — Previews restoration and verifies quarantine file integrity.
 5. `POST /api/quarantine/restore/execute` — Re-attaches file to original path with `"RESTORE"` confirmation.
+

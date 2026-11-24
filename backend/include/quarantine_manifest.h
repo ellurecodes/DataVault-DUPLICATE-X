@@ -107,3 +107,4 @@ StatusCode quarantine_manifest_reconcile(QuarantineManifest *manifest);
 #endif
 
 #endif /* DATAVAULT_QUARANTINE_MANIFEST_H */
+
