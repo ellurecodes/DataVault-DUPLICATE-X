@@ -245,7 +245,7 @@ int wmain(void) {
     size_t initial_cap = ht_resize->capacity;
     assert(initial_cap == 5);
 
-    /* Insert 25 distinct keys to trigger multiple resizing events */
+    /* Insert 25 distinct keys to trigger dynamic resizing */
     for (uint64_t i = 1; i <= 25; i++) {
         uint8_t dummy_hash[32] = {0};
         dummy_hash[0] = (uint8_t)i;
@@ -256,10 +256,11 @@ int wmain(void) {
         assert(res != NULL);
     }
 
-    assert(ht_resize->capacity > initial_cap);
+    size_t final_cap = ht_resize->capacity;
+    assert(final_cap > initial_cap);
     assert(ht_resize->count == 25);
 
-    /* Verify all 25 entries remain accessible after resizes */
+    /* Verify all 25 entries remain accessible after resizing */
     for (uint64_t i = 1; i <= 25; i++) {
         uint8_t dummy_hash[32] = {0};
         dummy_hash[0] = (uint8_t)i;
@@ -269,7 +270,7 @@ int wmain(void) {
         assert(found->file_size == i * 10);
     }
     hashtable_free(ht_resize);
-    printf("PASS (Resized from 5 to %zu, all 25 accessible)\n", initial_cap);
+    printf("PASS (Resized from %zu to %zu, all 25 accessible)\n", initial_cap, final_cap);
 
     /* ----------------------------------------------------
      * TEST 9: File marked as modified during scan
