@@ -143,12 +143,14 @@ void api_build_http_response(ApiResponseBuffer *buf,
     api_buffer_append(buf, "Connection: close\r\n");
     api_buffer_append(buf, "Server: DUPLICATE-X/1.0 (DataVault C11 Engine)\r\n");
 
-    /* Local CORS support if origin header provided and allowed */
+    /* Local CORS support */
     if (origin_header && strlen(origin_header) > 0) {
         api_buffer_append_printf(buf, "Access-Control-Allow-Origin: %s\r\n", origin_header);
-        api_buffer_append(buf, "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n");
-        api_buffer_append(buf, "Access-Control-Allow-Headers: Content-Type\r\n");
+    } else {
+        api_buffer_append(buf, "Access-Control-Allow-Origin: *\r\n");
     }
+    api_buffer_append(buf, "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n");
+    api_buffer_append(buf, "Access-Control-Allow-Headers: Content-Type, Accept\r\n");
 
     /* End of HTTP headers */
     api_buffer_append(buf, "\r\n");
@@ -199,12 +201,14 @@ void api_build_raw_http_response(ApiResponseBuffer *buf,
     api_buffer_append(buf, "Connection: close\r\n");
     api_buffer_append(buf, "Server: DUPLICATE-X/1.0 (DataVault C11 Engine)\r\n");
 
-    /* Local CORS support if origin header provided and allowed */
+    /* Local CORS support */
     if (origin_header && strlen(origin_header) > 0) {
         api_buffer_append_printf(buf, "Access-Control-Allow-Origin: %s\r\n", origin_header);
-        api_buffer_append(buf, "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n");
-        api_buffer_append(buf, "Access-Control-Allow-Headers: Content-Type\r\n");
+    } else {
+        api_buffer_append(buf, "Access-Control-Allow-Origin: *\r\n");
     }
+    api_buffer_append(buf, "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n");
+    api_buffer_append(buf, "Access-Control-Allow-Headers: Content-Type, Accept\r\n");
 
     /* End of HTTP headers */
     api_buffer_append(buf, "\r\n");

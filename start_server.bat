@@ -8,3 +8,4 @@ echo ===================================================
 powershell -Command "Unblock-File '%~dp0backend\build\duplicate-x.exe' -ErrorAction SilentlyContinue"
 backend\build\duplicate-x.exe --server
 pause
+

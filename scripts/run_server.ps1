@@ -19,3 +19,4 @@ Write-Host "==========================================" -ForegroundColor Cyan
 
 Set-Location $WorkspaceRoot
 & $ExePath --server
+

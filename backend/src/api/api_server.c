@@ -43,8 +43,10 @@ void api_server_stop(void) {
 bool api_is_origin_allowed(const char *origin) {
     if (!origin || strlen(origin) == 0) return true; /* CLI tools without origin are allowed */
 
-    /* Strict local origin allowlist */
-    if (strncmp(origin, "http://localhost", 16) == 0 ||
+    /* Local and file origin allowlist (including 'null' sent by browsers on file:// requests) */
+    if (strcmp(origin, "null") == 0 ||
+        strncmp(origin, "file:", 5) == 0 ||
+        strncmp(origin, "http://localhost", 16) == 0 ||
         strncmp(origin, "https://localhost", 17) == 0 ||
         strncmp(origin, "http://127.0.0.1", 16) == 0 ||
         strncmp(origin, "https://127.0.0.1", 17) == 0) {
@@ -179,6 +181,7 @@ StatusCode api_server_run(ApiEngineContext *ctx, uint16_t port) {
     printf("GET  /api/top-k?k=5\n");
     printf("GET  /api/search/prefix?prefix=...\n\n");
     printf("API server running. Press Ctrl+C to shutdown.\n\n");
+    fflush(stdout);
 
     g_server_running = true;
 
