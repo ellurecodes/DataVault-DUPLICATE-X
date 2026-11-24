@@ -22,11 +22,14 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedK: 5,
         activeQuarantinePreview: null,
         activeRestorePreview: null,
-        quarantineTimerId: null
+        quarantineTimerId: null,
+        isCheckingHealth: false
     };
 
     // DOM Elements
     const elements = {
+        connectionStatus: document.getElementById('connectionStatus'),
+        btnRetryConnection: document.getElementById('btnRetryConnection'),
         btnRefresh: document.getElementById('btnRefresh'),
         navTabDuplicates: document.getElementById('navTabDuplicates'),
         navTabQuarantine: document.getElementById('navTabQuarantine'),
@@ -36,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         dirInput: document.getElementById('dirInput'),
         btnAddDir: document.getElementById('btnAddDir'),
+        btnBrowseFolder: document.getElementById('btnBrowseFolder'),
         btnClearAllDirs: document.getElementById('btnClearAllDirs'),
         btnStartScan: document.getElementById('btnStartScan'),
         scanBtnText: document.getElementById('scanBtnText'),
@@ -100,35 +104,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Update Run Deduplication Scan button state and tooltip
+     */
+    function updateScanButtonState() {
+        if (!elements.btnStartScan) return;
+        const hasDirs = state.directories.length > 0;
+        const canScan = hasDirs && state.isOnline && !state.isScanning;
+        elements.btnStartScan.disabled = !canScan;
+        if (!hasDirs) {
+            elements.btnStartScan.title = 'Add at least one directory to the queue to enable scanning';
+        } else if (!state.isOnline) {
+            elements.btnStartScan.title = 'Backend server is offline. Click Retry Connection to reconnect.';
+        } else if (state.isScanning) {
+            elements.btnStartScan.title = 'Filesystem scan currently in progress...';
+        } else {
+            elements.btnStartScan.title = 'Run Deduplication Scan';
+        }
+    }
+
+    /**
      * Check backend health and sync state
      */
-    async function checkHealth() {
+    async function checkHealth(manual = false) {
+        if (state.isCheckingHealth) return;
+        state.isCheckingHealth = true;
+        DashboardUI.renderConnectionStatus('connecting');
+
         try {
             const health = await DuplicateXApi.getHealth();
             const wasOffline = !state.isOnline;
             state.isOnline = (health && health.status === 'ok');
             DashboardUI.renderConnectionStatus(state.isOnline, '127.0.0.1:8080');
-            if (state.isOnline && wasOffline) {
-                // Recovered from offline: reload dashboard telemetry
-                refreshAllData();
+            updateScanButtonState();
+
+            if (state.isOnline) {
+                if (wasOffline || manual) {
+                    await fetchTelemetryData();
+                }
+            } else {
+                DashboardUI.renderConnectionStatus(false);
             }
         } catch (err) {
             state.isOnline = false;
             DashboardUI.renderConnectionStatus(false);
+            updateScanButtonState();
+            if (manual) {
+                DashboardUI.showToast('Connection Failed', 'Could not reach backend at 127.0.0.1:8080. Ensure duplicate-x.exe is running.', 'error');
+            }
+        } finally {
+            state.isCheckingHealth = false;
         }
     }
 
     /**
-     * Refresh all telemetry and data from C backend
+     * Fetch all telemetry metrics, duplicate groups, and Top K rankings
      */
-    async function refreshAllData() {
-        DashboardUI.renderMetricsLoading();
-        await checkHealth();
-        if (!state.isOnline) {
-            DashboardUI.renderMetricsError('Server offline (127.0.0.1:8080)');
-            return;
-        }
-
+    async function fetchTelemetryData() {
         try {
             // Fetch fresh stats from GET /api/stats
             const stats = await DuplicateXApi.getStats();
@@ -169,6 +200,19 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('[APP] Error refreshing dashboard data:', err);
             DashboardUI.renderMetricsError(err.message || 'Failed to fetch statistics');
         }
+    }
+
+    /**
+     * Refresh all telemetry and data from C backend
+     */
+    async function refreshAllData() {
+        DashboardUI.renderMetricsLoading();
+        await checkHealth();
+        if (!state.isOnline) {
+            DashboardUI.renderMetricsError('Server offline (127.0.0.1:8080)');
+            return;
+        }
+        await fetchTelemetryData();
     }
 
     /**
@@ -467,6 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (addedCount > 0) {
             DashboardUI.renderConfiguredDirs(state.directories, removeDirectory);
             DashboardUI.showToast('Directory Queued', `Added ${addedCount} folder(s) to target comparison queue.`, 'info');
+            updateScanButtonState();
         } else if (rawPaths.length === 1 && state.directories.includes(cleanDirectoryPath(dirPath))) {
             DashboardUI.showToast('Already Queued', 'This directory is already in your target comparison queue.', 'warning');
         }
@@ -484,6 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (index >= 0 && index < state.directories.length) {
             state.directories.splice(index, 1);
             DashboardUI.renderConfiguredDirs(state.directories, removeDirectory);
+            updateScanButtonState();
         }
     }
 
@@ -492,31 +538,45 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     async function startScan() {
         if (state.isScanning) return;
-        if (state.directories.length === 0) {
-            DashboardUI.showToast('Queue Empty', 'Please enter at least one directory path before scanning.', 'warning');
-            elements.dirInput.focus();
+
+        if (!state.isOnline) {
+            DashboardUI.showToast('Server Offline', 'Cannot start scan while C backend is offline. Please start the backend.', 'error');
+            updateScanButtonState();
+            return;
+        }
+
+        const validDirs = state.directories.filter(d => typeof d === 'string' && d.trim().length > 0);
+        if (validDirs.length === 0) {
+            DashboardUI.showToast('Queue Empty', 'Please enter or select at least one valid directory before scanning.', 'warning');
+            updateScanButtonState();
+            if (elements.dirInput) elements.dirInput.focus();
             return;
         }
 
         state.isScanning = true;
-        elements.btnStartScan.disabled = true;
+        updateScanButtonState();
         elements.scanBtnText.textContent = 'Scanning Storage...';
         elements.scanStatusIndicator.style.display = 'flex';
         elements.scanStatusMsg.textContent = 'Traversing directories, computing SHA-256 signatures, and detecting duplicates...';
 
         try {
-            const scanResult = await DuplicateXApi.triggerScan(state.directories);
-            elements.scanStatusMsg.textContent = 'Scan completed successfully! Updating dashboard...';
-            DashboardUI.showToast('Scan Completed', `Discovered ${scanResult.files_discovered || 0} files and ${scanResult.duplicate_groups || 0} duplicate groups.`, 'success');
-
-            // Reload all telemetry, top K, duplicates, and quarantine history
-            await refreshAllData();
+            const scanResult = await DuplicateXApi.triggerScan(validDirs);
+            if (scanResult && scanResult.scan_status === 'COMPLETED') {
+                elements.scanStatusMsg.textContent = 'Scan completed successfully! Updating dashboard...';
+                DashboardUI.showToast('Scan Completed', `Discovered ${scanResult.files_discovered || 0} files and ${scanResult.duplicate_groups || 0} duplicate groups.`, 'success');
+                // Reload all telemetry, top K, duplicates, and quarantine history
+                await refreshAllData();
+            } else {
+                const msg = (scanResult && scanResult.message) ? scanResult.message : 'Filesystem scan was rejected by engine.';
+                throw new Error(msg);
+            }
         } catch (err) {
-            DashboardUI.showToast('Scan Error', err.message, 'error');
-            elements.scanStatusMsg.textContent = `Scan failed: ${err.message}`;
+            console.error('[APP] Scan execution error:', err);
+            DashboardUI.showToast('Scan Error', err.message || 'Filesystem scan failed.', 'error');
+            elements.scanStatusMsg.textContent = `Scan failed: ${err.message || 'Engine execution error'}`;
         } finally {
             state.isScanning = false;
-            elements.btnStartScan.disabled = false;
+            updateScanButtonState();
             elements.scanBtnText.textContent = 'Run Deduplication Scan';
             setTimeout(() => {
                 if (!state.isScanning) {
@@ -582,46 +642,52 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Folder Picker Dialog
-    const btnBrowseFolder = document.getElementById('btnBrowseFolder');
-    const folderPickerInput = document.getElementById('folderPickerInput');
+    // Native Windows Folder Picker via C Backend
+    if (elements.btnBrowseFolder) {
+        elements.btnBrowseFolder.addEventListener('click', async () => {
+            if (!state.isOnline) {
+                DashboardUI.showToast('Backend Offline', 'Cannot open native Windows folder picker while backend is offline. Click Retry Connection above.', 'warning');
+                return;
+            }
 
-    if (btnBrowseFolder && folderPickerInput) {
-        btnBrowseFolder.addEventListener('click', () => {
-            folderPickerInput.value = '';
-            folderPickerInput.click();
-        });
+            const origHtml = elements.btnBrowseFolder.innerHTML;
+            elements.btnBrowseFolder.disabled = true;
+            elements.btnBrowseFolder.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="rotating">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                Selecting Folder...
+            `;
 
-        folderPickerInput.addEventListener('change', (e) => {
-            const files = e.target.files;
-            if (!files || files.length === 0) return;
-
-            const firstFile = files[0];
-            let folderPath = firstFile.path;
-
-            if (folderPath) {
-                const relPath = firstFile.webkitRelativePath || '';
-                const parts = relPath.split('/');
-                if (parts.length > 1) {
-                    const rootName = parts[0];
-                    const idx = folderPath.lastIndexOf(rootName);
-                    if (idx !== -1) {
-                        folderPath = folderPath.substring(0, idx + rootName.length);
-                    }
+            try {
+                const res = await DuplicateXApi.openFolderPicker();
+                if (res && res.selected && res.path) {
+                    elements.dirInput.value = res.path;
+                    addDirectory(res.path);
+                    DashboardUI.showToast('Folder Selected', `Added to Target Queue: ${res.path}`, 'success');
+                } else if (res && res.status === 'cancelled') {
+                    DashboardUI.showToast('Browse Cancelled', 'No directory was selected.', 'info');
+                } else {
+                    DashboardUI.showToast('Browse Notification', 'Folder dialog closed.', 'info');
                 }
-                addDirectory(folderPath);
-            } else if (firstFile.webkitRelativePath) {
-                const rootName = firstFile.webkitRelativePath.split('/')[0];
-                const defaultPath = rootName.startsWith('device_') ? `data/test_files/${rootName}` : rootName;
-                const userPath = prompt(
-                    `Folder "${rootName}" selected!\n\nDue to web browser sandbox restrictions, please confirm the local directory path:`,
-                    defaultPath
-                );
-                if (userPath) {
-                    addDirectory(userPath);
-                }
+            } catch (err) {
+                console.error('[APP] Native folder picker error:', err);
+                DashboardUI.showToast('Browse Failed', err.message || 'Could not open native Windows folder picker.', 'error');
+            } finally {
+                elements.btnBrowseFolder.disabled = false;
+                elements.btnBrowseFolder.innerHTML = origHtml;
             }
         });
+    }
+
+    // Retry Connection Click Handlers
+    if (elements.btnRetryConnection) {
+        elements.btnRetryConnection.addEventListener('click', () => checkHealth(true));
+    }
+    if (elements.connectionStatus) {
+        elements.connectionStatus.addEventListener('click', () => checkHealth(true));
     }
 
     // Quick Sample Buttons
@@ -680,6 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.btnClearAllDirs.addEventListener('click', () => {
             state.directories = [];
             DashboardUI.renderConfiguredDirs(state.directories, removeDirectory);
+            updateScanButtonState();
         });
     }
 
@@ -832,10 +899,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Initial UI state
+    updateScanButtonState();
+
     // Initial load: test connection & fetch initial stats + history
     refreshAllData();
 
-    // Periodic heartbeat every 4 seconds to maintain connection status
-    setInterval(checkHealth, 4000);
+    // Periodic heartbeat every 6 seconds to maintain connection status
+    setInterval(() => checkHealth(false), 6000);
 });
 

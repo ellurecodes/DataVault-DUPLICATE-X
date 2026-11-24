@@ -53,7 +53,7 @@ jobs:
             backend/src/platform/windows/win_crypto.c \
             backend/src/platform/windows/win_file_compare.c \
             -o backend/build/duplicate-x.exe \
-            -lbcrypt -lws2_32
+            -lbcrypt -lws2_32 -lole32 -lshell32 -luuid
           ls -l backend/build/duplicate-x.exe
 
       - name: Compile Part 4 Verification Test Suite
@@ -131,7 +131,7 @@ jobs:
             backend/src/platform/windows/win_crypto.c \
             backend/src/platform/windows/win_file_compare.c \
             -o backend/build/test_api.exe \
-            -lbcrypt -lws2_32
+            -lbcrypt -lws2_32 -lole32 -lshell32 -luuid
           ls -l backend/build/test_api.exe
 
       - name: Execute Part 6A/6B 22-Scenario REST API & Frontend Serving Test Suite

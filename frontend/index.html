@@ -28,10 +28,18 @@
             </div>
 
             <div class="header-controls">
-                <div id="connectionStatus" class="status-pill status-checking">
+                <div id="connectionStatus" class="status-pill status-checking" role="button" tabindex="0" title="Click to test backend connection">
                     <span class="status-dot"></span>
                     <span class="status-text">Connecting...</span>
                 </div>
+                <button id="btnRetryConnection" class="btn btn-secondary btn-icon" style="display: none;" title="Retry Server Connection">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    <span>Retry</span>
+                </button>
                 <button id="btnRefresh" class="btn btn-secondary btn-icon" title="Refresh Engine Stats">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="23 4 23 10 17 10"></polyline>
@@ -161,13 +169,12 @@
                         </svg>
                         Add Directory
                     </button>
-                    <button type="button" id="btnBrowseFolder" class="btn btn-secondary" title="Browse and select a folder">
+                    <button type="button" id="btnBrowseFolder" class="btn btn-secondary" title="Open native Windows folder selection dialog">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                         </svg>
                         Browse Folder...
                     </button>
-                    <input type="file" id="folderPickerInput" webkitdirectory directory multiple style="display: none;">
                 </div>
 
                 <!-- Quick Sample Folders Bar -->
@@ -193,7 +200,7 @@
 
             <!-- Scan Action Bar -->
             <div class="scan-actions-bar">
-                <button id="btnStartScan" class="btn btn-primary btn-large">
+                <button id="btnStartScan" class="btn btn-primary btn-large" disabled title="Add at least one directory to the queue to enable scanning">
                     <svg class="scan-btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="5 3 19 12 5 21 5 3"></polygon>
                     </svg>

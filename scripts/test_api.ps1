@@ -56,7 +56,7 @@ $ApiTestSources = @(
 )
 
 Write-Host "`n[INFO] Compiling Part 6A API test suite..." -ForegroundColor Cyan
-& "$GccPath" -std=c11 -Wall -Wextra -Wpedantic "-I$IncludeDir" $ApiTestSources -o "$ApiTestExe" -lbcrypt -lws2_32
+& "$GccPath" -std=c11 -Wall -Wextra -Wpedantic "-I$IncludeDir" $ApiTestSources -o "$ApiTestExe" -lbcrypt -lws2_32 -lole32 -lshell32 -luuid
 $compileExit = $LASTEXITCODE
 
 if ($compileExit -ne 0 -or -not (Test-Path $ApiTestExe)) {

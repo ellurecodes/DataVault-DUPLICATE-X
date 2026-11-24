@@ -10,7 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#define COBJMACROS
 #include <windows.h>
+#include <shobjidl.h>
+#include <objbase.h>
 
 /* Forward handlers */
 static void handle_health(const ApiHttpRequest *req, ApiResponseBuffer *resp);
@@ -18,6 +21,7 @@ static void handle_stats(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiRe
 static void handle_duplicates(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
 static void handle_top_k(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
 static void handle_search_prefix(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
+static void handle_folder_picker(const ApiHttpRequest *req, ApiResponseBuffer *resp);
 static void handle_scan(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
 static void handle_quarantine_preview(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
 static void handle_quarantine_execute(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
@@ -209,6 +213,16 @@ void api_route_request(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResp
                 return;
             }
             handle_search_prefix(ctx, req, out_resp);
+            return;
+        }
+
+        /* Route: POST /api/folder-picker */
+        if (strcmp(req->path, "/api/folder-picker") == 0) {
+            if (strcmp(req->method, "POST") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use POST.", req->origin);
+                return;
+            }
+            handle_folder_picker(req, out_resp);
             return;
         }
 
@@ -539,6 +553,106 @@ static void handle_search_prefix(ApiEngineContext *ctx, const ApiHttpRequest *re
 
     api_buffer_append(&json, "\n  ]\n}");
     trie_search_results_free(&results);
+
+    api_build_http_response(resp, 200, "OK", json.data, req->origin);
+    api_buffer_free(&json);
+}
+
+static void handle_folder_picker(const ApiHttpRequest *req, ApiResponseBuffer *resp) {
+    if (strcmp(req->method, "POST") != 0) {
+        api_build_error_response(resp, 405, "Method Not Allowed. Use POST.", req->origin);
+        return;
+    }
+
+    /* Initialize COM library for this thread */
+    HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    bool co_initialized = SUCCEEDED(hr);
+    if (!co_initialized && hr != RPC_E_CHANGED_MODE) {
+        api_build_error_response(resp, 500, "COM library initialization failed.", req->origin);
+        return;
+    }
+
+    IFileOpenDialog *pDlg = NULL;
+    hr = CoCreateInstance(&CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER,
+                          &IID_IFileOpenDialog, (void **)&pDlg);
+
+    if (FAILED(hr) || !pDlg) {
+        if (co_initialized) CoUninitialize();
+        api_build_error_response(resp, 500, "Failed to instantiate Windows FileOpenDialog.", req->origin);
+        return;
+    }
+
+    /* Configure native folder selection options */
+    FILEOPENDIALOGOPTIONS opt = 0;
+    if (SUCCEEDED(IFileOpenDialog_GetOptions(pDlg, &opt))) {
+        IFileOpenDialog_SetOptions(pDlg, opt | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
+    }
+    IFileOpenDialog_SetTitle(pDlg, L"Select Target Directory for Deduplication - DUPLICATE-X");
+
+    /* Show native modal dialog */
+    hr = IFileOpenDialog_Show(pDlg, NULL);
+
+    if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED) || hr == (HRESULT)0x800704C7) {
+        /* User cancelled dialog cleanly */
+        IFileOpenDialog_Release(pDlg);
+        if (co_initialized) CoUninitialize();
+
+        ApiResponseBuffer json;
+        api_buffer_init(&json);
+        api_buffer_append(&json, "{\n  \"status\": \"cancelled\",\n  \"selected\": false,\n  \"path\": null\n}");
+        api_build_http_response(resp, 200, "OK", json.data, req->origin);
+        api_buffer_free(&json);
+        return;
+    }
+
+    if (FAILED(hr)) {
+        IFileOpenDialog_Release(pDlg);
+        if (co_initialized) CoUninitialize();
+        api_build_error_response(resp, 500, "Windows folder selection dialog encountered an error.", req->origin);
+        return;
+    }
+
+    /* Retrieve selected folder item */
+    IShellItem *pItem = NULL;
+    hr = IFileOpenDialog_GetResult(pDlg, &pItem);
+    if (FAILED(hr) || !pItem) {
+        IFileOpenDialog_Release(pDlg);
+        if (co_initialized) CoUninitialize();
+        api_build_error_response(resp, 500, "Failed to retrieve selected folder item.", req->origin);
+        return;
+    }
+
+    PWSTR pszFilePath = NULL;
+    hr = IShellItem_GetDisplayName(pItem, SIGDN_FILESYSPATH, &pszFilePath);
+    if (FAILED(hr) || !pszFilePath) {
+        IShellItem_Release(pItem);
+        IFileOpenDialog_Release(pDlg);
+        if (co_initialized) CoUninitialize();
+        api_build_error_response(resp, 500, "Failed to resolve folder filesystem path.", req->origin);
+        return;
+    }
+
+    /* Convert wide path (UTF-16) to UTF-8 */
+    char utf8_path[MAX_PATH * 3] = {0};
+    int conv_res = WideCharToMultiByte(CP_UTF8, 0, pszFilePath, -1, utf8_path, sizeof(utf8_path) - 1, NULL, NULL);
+
+    /* Free all COM resources cleanly */
+    CoTaskMemFree(pszFilePath);
+    IShellItem_Release(pItem);
+    IFileOpenDialog_Release(pDlg);
+    if (co_initialized) CoUninitialize();
+
+    if (conv_res <= 0) {
+        api_build_error_response(resp, 500, "Failed to convert selected folder path to UTF-8.", req->origin);
+        return;
+    }
+
+    /* Build JSON response with actual absolute path */
+    ApiResponseBuffer json;
+    api_buffer_init(&json);
+    api_buffer_append(&json, "{\n  \"status\": \"selected\",\n  \"selected\": true,\n  \"path\": ");
+    api_buffer_append_escaped_json(&json, utf8_path);
+    api_buffer_append(&json, "\n}");
 
     api_build_http_response(resp, 200, "OK", json.data, req->origin);
     api_buffer_free(&json);

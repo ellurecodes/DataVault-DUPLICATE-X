@@ -374,7 +374,7 @@ int main(void) {
     /* ----------------------------------------------------
      * TEST 22: GET /js/dashboard.js serves JavaScript file (HTTP 200)
      * ---------------------------------------------------- */
-    printf("[TEST 22/22] GET /js/dashboard.js serves JavaScript file (HTTP 200)... ");
+    printf("[TEST 22/24] GET /js/dashboard.js serves JavaScript file (HTTP 200)... ");
     ApiHttpRequest req22;
     ApiResponseBuffer resp22;
     api_buffer_init(&resp22);
@@ -386,10 +386,38 @@ int main(void) {
     api_buffer_free(&resp22);
     printf("PASS (dashboard.js served with application/javascript)\n");
 
+    /* ----------------------------------------------------
+     * TEST 23: GET /api/folder-picker returns HTTP 405 Method Not Allowed
+     * ---------------------------------------------------- */
+    printf("[TEST 23/24] GET /api/folder-picker returns HTTP 405... ");
+    ApiHttpRequest req23;
+    ApiResponseBuffer resp23;
+    api_buffer_init(&resp23);
+    const char *raw23 = "GET /api/folder-picker HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n\r\n";
+    api_parse_http_request(raw23, strlen(raw23), &req23);
+    api_route_request(&ctx, &req23, &resp23);
+    assert(strstr(resp23.data, "HTTP/1.1 405 Method Not Allowed") != NULL);
+    api_buffer_free(&resp23);
+    printf("PASS (method restriction enforced on folder-picker)\n");
+
+    /* ----------------------------------------------------
+     * TEST 24: OPTIONS /api/folder-picker returns HTTP 204 No Content with CORS
+     * ---------------------------------------------------- */
+    printf("[TEST 24/24] OPTIONS /api/folder-picker returns HTTP 204... ");
+    ApiHttpRequest req24;
+    ApiResponseBuffer resp24;
+    api_buffer_init(&resp24);
+    const char *raw24 = "OPTIONS /api/folder-picker HTTP/1.1\r\nHost: 127.0.0.1:8080\r\nOrigin: http://127.0.0.1:8080\r\n\r\n";
+    api_parse_http_request(raw24, strlen(raw24), &req24);
+    api_route_request(&ctx, &req24, &resp24);
+    assert(strstr(resp24.data, "HTTP/1.1 204 No Content") != NULL);
+    api_buffer_free(&resp24);
+    printf("PASS (CORS preflight supported on folder-picker)\n");
+
     api_engine_context_cleanup(&ctx);
 
     printf("\n====================================================\n");
-    printf(" ALL 22 REST API & FRONTEND SERVING TESTS PASSED WITH 100%% SUCCESS!\n");
+    printf(" ALL 24 REST API & FRONTEND SERVING TESTS PASSED WITH 100%% SUCCESS!\n");
     printf("====================================================\n");
 
     return EXIT_SUCCESS;

@@ -95,7 +95,10 @@ $CompilerFlags = @(
 
 $LinkerFlags = @(
     "-lbcrypt",
-    "-lws2_32"
+    "-lws2_32",
+    "-lole32",
+    "-lshell32",
+    "-luuid"
 )
 
 Write-Host "[INFO] Compiling backend sources:" -ForegroundColor Cyan

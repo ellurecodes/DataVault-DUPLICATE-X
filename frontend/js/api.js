@@ -92,6 +92,16 @@ const DuplicateXApi = {
     },
 
     /**
+     * Open native Windows folder selection dialog through C backend
+     * POST /api/folder-picker
+     */
+    async openFolderPicker() {
+        return await this._request('/api/folder-picker', {
+            method: 'POST'
+        });
+    },
+
+    /**
      * Trigger filesystem scan across one or more target directories
      * POST /api/scan
      */

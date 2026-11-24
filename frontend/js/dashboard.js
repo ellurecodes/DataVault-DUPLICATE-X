@@ -55,13 +55,22 @@ const DashboardUI = {
      */
     renderConnectionStatus(isOnline, hostText = '127.0.0.1:8080') {
         const el = document.getElementById('connectionStatus');
+        const retryBtn = document.getElementById('btnRetryConnection');
         if (!el) return;
 
-        el.className = 'status-pill ' + (isOnline ? 'status-online' : 'status-offline');
-        el.innerHTML = `
-            <span class="status-dot"></span>
-            <span class="status-text">${isOnline ? `Online (${hostText})` : 'Server Offline'}</span>
-        `;
+        if (isOnline === 'connecting') {
+            el.className = 'status-pill status-checking';
+            el.innerHTML = '<span class="status-dot"></span><span class="status-text">Connecting...</span>';
+            if (retryBtn) retryBtn.style.display = 'none';
+        } else if (isOnline === true || isOnline === 'online') {
+            el.className = 'status-pill status-online';
+            el.innerHTML = `<span class="status-dot"></span><span class="status-text">Online (${hostText})</span>`;
+            if (retryBtn) retryBtn.style.display = 'none';
+        } else {
+            el.className = 'status-pill status-offline';
+            el.innerHTML = '<span class="status-dot"></span><span class="status-text">Server Offline</span>';
+            if (retryBtn) retryBtn.style.display = 'inline-flex';
+        }
     },
 
     /**
