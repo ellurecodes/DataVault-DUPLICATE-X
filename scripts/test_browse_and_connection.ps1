@@ -30,7 +30,7 @@ function Assert-Check($testNum, $description, $condition, $passMsg = "PASS") {
         $script:Passed++
     } else {
         Write-Host "FAIL" -ForegroundColor Red
-        throw "Assertion failed for check $testNum: $description"
+        throw "Assertion failed for check ${testNum}: $description"
     }
 }
 
@@ -63,12 +63,12 @@ Assert-Check 4 "Native folder picker endpoint POST /api/folder-picker routed in 
 
 # 5. Folder picker cancellation handling in C backend
 Assert-Check 5 "Folder picker cancellation handled without error (status: cancelled)" `
-    ($router -match 'ERROR_CANCELLED' -and $router -match '"status": "cancelled"' -and $router -match '"selected": false') `
+    ($router -match 'ERROR_CANCELLED' -and $router -match 'status[\\"\s:]+cancelled' -and $router -match 'selected[\\"\s:]+false') `
     "PASS (Cancellation returns 200 with status cancelled cleanly)"
 
 # 6. Selected absolute path returned correctly in C backend
 Assert-Check 6 "Selected folder returns filesystem path (status: selected, SIGDN_FILESYSPATH)" `
-    ($router -match 'SIGDN_FILESYSPATH' -and $router -match 'CoTaskMemFree' -and $router -match '"status": "selected"') `
+    ($router -match 'SIGDN_FILESYSPATH' -and $router -match 'CoTaskMemFree' -and $router -match 'status[\\"\s:]+selected') `
     "PASS (COM IShellItem retrieves and converts SIGDN_FILESYSPATH)"
 
 # 7. Browse selection adds directory to target queue in app.js
