@@ -5,21 +5,29 @@
  */
 
 const DuplicateXApi = {
-    baseUrl: '', // Same-origin relative URLs directly to C Winsock2 backend
+    // If opened via file:// or another port (e.g. Live Server :5500), connect directly to local C server on port 8080
+    baseUrl: (typeof window !== 'undefined' && (window.location.protocol === 'file:' || (window.location.port && window.location.port !== '8080')))
+        ? 'http://127.0.0.1:8080'
+        : '',
 
     /**
      * Helper to perform fetch requests with error handling
      */
     async _request(endpoint, options = {}) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
         try {
             const url = `${this.baseUrl}${endpoint}`;
             const response = await fetch(url, {
                 ...options,
+                signal: options.signal || controller.signal,
                 headers: {
                     'Accept': 'application/json',
                     ...(options.headers || {})
                 }
             });
+            clearTimeout(timeoutId);
 
             const contentType = response.headers.get('content-type') || '';
             const isJson = contentType.includes('application/json');
@@ -37,6 +45,7 @@ const DuplicateXApi = {
 
             return data;
         } catch (err) {
+            clearTimeout(timeoutId);
             console.error(`[API ERROR] ${options.method || 'GET'} ${endpoint}:`, err);
             throw err;
         }

@@ -105,8 +105,13 @@ document.addEventListener('DOMContentLoaded', () => {
     async function checkHealth() {
         try {
             const health = await DuplicateXApi.getHealth();
+            const wasOffline = !state.isOnline;
             state.isOnline = (health && health.status === 'ok');
             DashboardUI.renderConnectionStatus(state.isOnline, '127.0.0.1:8080');
+            if (state.isOnline && wasOffline) {
+                // Recovered from offline: reload dashboard telemetry
+                refreshAllData();
+            }
         } catch (err) {
             state.isOnline = false;
             DashboardUI.renderConnectionStatus(false);
@@ -830,7 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial load: test connection & fetch initial stats + history
     refreshAllData();
 
-    // Periodic heartbeat every 10 seconds to maintain connection status
-    setInterval(checkHealth, 10000);
+    // Periodic heartbeat every 4 seconds to maintain connection status
+    setInterval(checkHealth, 4000);
 });
 
