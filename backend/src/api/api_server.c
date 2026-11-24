@@ -208,23 +208,52 @@ StatusCode api_server_run(ApiEngineContext *ctx, uint16_t port) {
             continue;
         }
 
-        /* Set client socket receive timeout (5 seconds) */
-        DWORD timeout_ms = 5000;
+        /* Set client socket receive and send timeouts (1500 ms) */
+        DWORD timeout_ms = 1500;
         setsockopt(client_sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout_ms, sizeof(timeout_ms));
         setsockopt(client_sock, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout_ms, sizeof(timeout_ms));
 
-        /* Read HTTP request buffer */
+        /* Read HTTP request buffer with multi-packet framing */
         char req_buf[API_MAX_REQUEST_SIZE + 1];
-        int bytes_received = recv(client_sock, req_buf, API_MAX_REQUEST_SIZE, 0);
+        int total_received = 0;
 
-        if (bytes_received > 0) {
-            req_buf[bytes_received] = '\0';
+        /* Step 1: Read headers until \r\n\r\n marker */
+        const char *body_marker = NULL;
+        while (total_received < API_MAX_REQUEST_SIZE) {
+            int n = recv(client_sock, req_buf + total_received, API_MAX_REQUEST_SIZE - total_received, 0);
+            if (n <= 0) break;
+            total_received += n;
+            req_buf[total_received] = '\0';
+            body_marker = strstr(req_buf, "\r\n\r\n");
+            if (body_marker) break;
+        }
+
+        if (total_received > 0 && body_marker) {
+            size_t header_len = (size_t)(body_marker + 4 - req_buf);
+            size_t body_received = (size_t)total_received - header_len;
+
+            /* Step 2: Check Content-Length for payloads */
+            size_t content_length = 0;
+            const char *cl = strstr(req_buf, "Content-Length:");
+            if (!cl) cl = strstr(req_buf, "content-length:");
+            if (cl && cl < body_marker) {
+                content_length = (size_t)strtoull(cl + 15, NULL, 10);
+            }
+
+            /* Step 3: Read remaining body bytes if payload spanned multiple TCP packets */
+            while (body_received < content_length && total_received < API_MAX_REQUEST_SIZE) {
+                int n = recv(client_sock, req_buf + total_received, API_MAX_REQUEST_SIZE - total_received, 0);
+                if (n <= 0) break;
+                total_received += n;
+                body_received += (size_t)n;
+                req_buf[total_received] = '\0';
+            }
 
             ApiHttpRequest req;
             ApiResponseBuffer resp;
             api_buffer_init(&resp);
 
-            if (api_parse_http_request(req_buf, (size_t)bytes_received, &req)) {
+            if (api_parse_http_request(req_buf, (size_t)total_received, &req)) {
                 /* Validate Origin security allowlist */
                 if (api_is_origin_allowed(req.origin)) {
                     api_route_request(ctx, &req, &resp);
@@ -235,14 +264,23 @@ StatusCode api_server_run(ApiEngineContext *ctx, uint16_t port) {
                 api_build_error_response(&resp, 400, "Malformed HTTP request syntax.", NULL);
             }
 
-            /* Send response */
+            /* Send response completely through loop */
             if (resp.data && resp.length > 0) {
-                send(client_sock, resp.data, (int)resp.length, 0);
+                const char *p = resp.data;
+                int remaining = (int)resp.length;
+                while (remaining > 0) {
+                    int sent = send(client_sock, p, remaining, 0);
+                    if (sent <= 0) break;
+                    p += sent;
+                    remaining -= sent;
+                }
             }
 
             api_buffer_free(&resp);
         }
 
+        /* Graceful TCP teardown to prevent connection resets */
+        shutdown(client_sock, SD_SEND);
         closesocket(client_sock);
     }
 

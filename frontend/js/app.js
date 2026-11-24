@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
         activeQuarantinePreview: null,
         activeRestorePreview: null,
         quarantineTimerId: null,
+        heartbeatTimerId: null,
         isCheckingHealth: false,
         hasInitialChecked: false
     };
@@ -136,25 +137,29 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const health = await DuplicateXApi.getHealth();
             const wasOffline = !state.isOnline;
-            state.isOnline = (health && health.status === 'ok');
+            state.isOnline = Boolean(health && health.status === 'ok' && health.application === 'DUPLICATE-X');
             state.hasInitialChecked = true;
-            DashboardUI.renderConnectionStatus(state.isOnline, '127.0.0.1:8080');
-            updateScanButtonState();
 
             if (state.isOnline) {
+                DashboardUI.renderConnectionStatus(true, '127.0.0.1:8080');
+                updateScanButtonState();
                 if (wasOffline || manual) {
                     await fetchTelemetryData();
                 }
             } else {
                 DashboardUI.renderConnectionStatus(false);
+                updateScanButtonState();
+                DashboardUI.renderMetricsError('Invalid server response');
             }
         } catch (err) {
             state.isOnline = false;
             state.hasInitialChecked = true;
             DashboardUI.renderConnectionStatus(false);
             updateScanButtonState();
+            DashboardUI.renderMetricsError('Server offline (127.0.0.1:8080)');
             if (manual) {
-                DashboardUI.showToast('Connection Failed', 'Could not reach backend at 127.0.0.1:8080. Ensure duplicate-x.exe is running.', 'error');
+                const reason = err.isTimeout ? 'Request timed out after 5 seconds' : (err.message || 'Server unreachable');
+                DashboardUI.showToast('Connection Failed', `Could not reach backend at 127.0.0.1:8080 (${reason}).`, 'error');
             }
         } finally {
             state.isCheckingHealth = false;
@@ -212,12 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     async function refreshAllData() {
         DashboardUI.renderMetricsLoading();
-        await checkHealth();
-        if (!state.isOnline) {
-            DashboardUI.renderMetricsError('Server offline (127.0.0.1:8080)');
-            return;
-        }
-        await fetchTelemetryData();
+        await checkHealth(true);
     }
 
     /**
@@ -904,13 +904,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Clean up timers on page unload
+    window.addEventListener('beforeunload', () => {
+        if (state.heartbeatTimerId) {
+            clearInterval(state.heartbeatTimerId);
+            state.heartbeatTimerId = null;
+        }
+        if (state.quarantineTimerId) {
+            clearInterval(state.quarantineTimerId);
+            state.quarantineTimerId = null;
+        }
+    });
+
     // Initial UI state
     updateScanButtonState();
 
     // Initial load: test connection & fetch initial stats + history
     refreshAllData();
 
-    // Periodic heartbeat every 6 seconds to maintain connection status
-    setInterval(() => checkHealth(false), 6000);
+    // Periodic heartbeat every 8 seconds to maintain connection status without excessive requests
+    state.heartbeatTimerId = setInterval(() => checkHealth(false), 8000);
 });
 

@@ -10,12 +10,20 @@ const DuplicateXApi = {
         ? 'http://127.0.0.1:8080'
         : '',
 
+    // In-flight health request promise to prevent duplicate concurrent checks
+    _pendingHealthPromise: null,
+
     /**
-     * Helper to perform fetch requests with error handling
+     * Helper to perform fetch requests with error handling and 5s timeout
      */
     async _request(endpoint, options = {}) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const timeoutMs = 5000;
+        let didTimeout = false;
+        const timeoutId = setTimeout(() => {
+            didTimeout = true;
+            controller.abort();
+        }, timeoutMs);
 
         try {
             const url = `${this.baseUrl}${endpoint}`;
@@ -31,7 +39,7 @@ const DuplicateXApi = {
                 });
             } catch (netErr) {
                 // If 127.0.0.1 failed on file:// protocol, attempt localhost fallback
-                if (this.baseUrl === 'http://127.0.0.1:8080') {
+                if (this.baseUrl === 'http://127.0.0.1:8080' && !didTimeout) {
                     const fallbackUrl = `http://localhost:8080${endpoint}`;
                     response = await fetch(fallbackUrl, {
                         ...options,
@@ -65,17 +73,55 @@ const DuplicateXApi = {
             return data;
         } catch (err) {
             clearTimeout(timeoutId);
+            if (didTimeout) {
+                const timeoutErr = new Error(`Connection timed out after ${timeoutMs}ms.`);
+                timeoutErr.isTimeout = true;
+                throw timeoutErr;
+            }
             console.error(`[API ERROR] ${options.method || 'GET'} ${endpoint}:`, err);
             throw err;
         }
     },
 
     /**
-     * Check server health status
+     * Check server health status with diagnostic logging and in-flight deduplication.
      * GET /api/health
      */
     async getHealth() {
-        return await this._request('/api/health');
+        if (this._pendingHealthPromise) {
+            return this._pendingHealthPromise;
+        }
+
+        this._pendingHealthPromise = (async () => {
+            const startTime = performance.now();
+            const isoTime = new Date().toISOString();
+            const targetUrl = `${this.baseUrl || 'http://127.0.0.1:8080'}/api/health`;
+
+            console.log(`[HEALTH CHECK START] URL: ${targetUrl} | Time: ${isoTime}`);
+
+            try {
+                const data = await this._request('/api/health');
+                const duration = (performance.now() - startTime).toFixed(1);
+
+                // Strict validation of application identity
+                if (!data || typeof data !== 'object' || data.status !== 'ok' || data.application !== 'DUPLICATE-X' || data.team !== 'DataVault') {
+                    const idErr = new Error(`Invalid application identity from server: ${JSON.stringify(data)}`);
+                    console.error(`[HEALTH CHECK FAILED] URL: ${targetUrl} | Duration: ${duration}ms | Error: ${idErr.message}`);
+                    throw idErr;
+                }
+
+                console.log(`[HEALTH CHECK SUCCESS] URL: ${targetUrl} | Status: 200 OK | Duration: ${duration}ms | Payload:`, data);
+                return data;
+            } catch (err) {
+                const duration = (performance.now() - startTime).toFixed(1);
+                console.error(`[HEALTH CHECK FAILED] URL: ${targetUrl} | Duration: ${duration}ms | Error: ${err.message}`);
+                throw err;
+            } finally {
+                this._pendingHealthPromise = null;
+            }
+        })();
+
+        return this._pendingHealthPromise;
     },
 
     /**
