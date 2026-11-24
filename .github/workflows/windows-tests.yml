@@ -1,0 +1,78 @@
+name: Windows CI - C11 Deduplication & Test Suite
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build & Run Part 4 Test Suite (Windows C11)
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup MinGW-w64 GCC Toolchain
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+
+      - name: Verify GCC Availability & Version
+        shell: msys2 {0}
+        run: |
+          which gcc
+          gcc --version
+
+      - name: Build DUPLICATE-X Main Engine
+        shell: msys2 {0}
+        run: |
+          mkdir -p backend/build
+          gcc -std=c11 -Wall -Wextra -Wpedantic -municode \
+            -Ibackend/include \
+            backend/src/main.c \
+            backend/src/core/engine.c \
+            backend/src/core/file_scanner.c \
+            backend/src/core/duplicate_detector.c \
+            backend/src/ds/hashtable.c \
+            backend/src/ds/duplicate_group.c \
+            backend/src/platform/windows/win_file_scanner.c \
+            backend/src/platform/windows/win_crypto.c \
+            backend/src/platform/windows/win_file_compare.c \
+            -o backend/build/duplicate-x.exe \
+            -lbcrypt
+          ls -l backend/build/duplicate-x.exe
+
+      - name: Compile Part 4 Verification Test Suite
+        shell: msys2 {0}
+        run: |
+          gcc -std=c11 -Wall -Wextra -Wpedantic -municode \
+            -Ibackend/include \
+            backend/tests/test_duplicate_detector.c \
+            backend/src/core/duplicate_detector.c \
+            backend/src/core/file_scanner.c \
+            backend/src/ds/hashtable.c \
+            backend/src/ds/duplicate_group.c \
+            backend/src/platform/windows/win_file_scanner.c \
+            backend/src/platform/windows/win_crypto.c \
+            backend/src/platform/windows/win_file_compare.c \
+            -o backend/build/test_duplicate_detector.exe \
+            -lbcrypt
+          ls -l backend/build/test_duplicate_detector.exe
+
+      - name: Execute Part 4 12-Scenario Test Suite
+        shell: msys2 {0}
+        run: |
+          ./backend/build/test_duplicate_detector.exe
+
+      - name: Smoke Test Main CLI
+        shell: msys2 {0}
+        run: |
+          ./backend/build/duplicate-x.exe --help
+

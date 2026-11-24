@@ -1,0 +1,32 @@
+# DUPLICATE-X .gitignore
+# Team DataVault (2026-2027)
+
+# Compiled binaries and build artifacts
+*.exe
+*.o
+*.obj
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+backend/build/
+
+# Dynamic/temporary test fixtures generated at runtime
+data/test_fixtures_p4/
+
+# IDE, Editor, and OS cache
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Sensitive local credentials or logs
+*.log
+*.env
+*.key
+*.pem
