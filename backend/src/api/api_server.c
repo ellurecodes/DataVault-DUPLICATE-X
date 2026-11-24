@@ -20,10 +20,12 @@ void api_engine_context_init(ApiEngineContext *ctx) {
     ctx->successfully_hashed = 0;
     snprintf(ctx->last_scan_status, sizeof(ctx->last_scan_status), "IDLE");
     ctx->has_completed_scan = false;
+    quarantine_manager_init(&ctx->quarantine_mgr, "data/quarantine_manifest.json", "data/quarantine_journal.log");
 }
 
 void api_engine_context_cleanup(ApiEngineContext *ctx) {
     if (!ctx) return;
+    quarantine_manager_cleanup(&ctx->quarantine_mgr);
     duplicate_group_list_free(&ctx->duplicate_groups);
     file_inventory_free(&ctx->inventory);
     if (ctx->trie) {

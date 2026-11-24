@@ -19,6 +19,11 @@ static void handle_duplicates(ApiEngineContext *ctx, const ApiHttpRequest *req, 
 static void handle_top_k(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
 static void handle_search_prefix(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
 static void handle_scan(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
+static void handle_quarantine_preview(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
+static void handle_quarantine_execute(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
+static void handle_quarantine_history(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
+static void handle_quarantine_restore_preview(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
+static void handle_quarantine_restore_execute(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp);
 static void handle_static_file(const ApiHttpRequest *req, ApiResponseBuffer *resp);
 
 /* Helper to convert hex character to integer */
@@ -205,6 +210,56 @@ void api_route_request(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResp
                 return;
             }
             handle_scan(ctx, req, out_resp);
+            return;
+        }
+
+        /* Route: POST /api/quarantine/preview */
+        if (strcmp(req->path, "/api/quarantine/preview") == 0) {
+            if (strcmp(req->method, "POST") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use POST.", req->origin);
+                return;
+            }
+            handle_quarantine_preview(ctx, req, out_resp);
+            return;
+        }
+
+        /* Route: POST /api/quarantine/execute */
+        if (strcmp(req->path, "/api/quarantine/execute") == 0) {
+            if (strcmp(req->method, "POST") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use POST.", req->origin);
+                return;
+            }
+            handle_quarantine_execute(ctx, req, out_resp);
+            return;
+        }
+
+        /* Route: GET /api/quarantine/history */
+        if (strcmp(req->path, "/api/quarantine/history") == 0) {
+            if (strcmp(req->method, "GET") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use GET.", req->origin);
+                return;
+            }
+            handle_quarantine_history(ctx, req, out_resp);
+            return;
+        }
+
+        /* Route: POST /api/quarantine/restore/preview */
+        if (strcmp(req->path, "/api/quarantine/restore/preview") == 0) {
+            if (strcmp(req->method, "POST") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use POST.", req->origin);
+                return;
+            }
+            handle_quarantine_restore_preview(ctx, req, out_resp);
+            return;
+        }
+
+        /* Route: POST /api/quarantine/restore/execute */
+        if (strcmp(req->path, "/api/quarantine/restore/execute") == 0) {
+            if (strcmp(req->method, "POST") != 0) {
+                api_build_error_response(out_resp, 405, "Method Not Allowed. Use POST.", req->origin);
+                return;
+            }
+            handle_quarantine_restore_execute(ctx, req, out_resp);
             return;
         }
 
@@ -574,6 +629,302 @@ static void handle_scan(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiRes
                              (unsigned long long)ctx->duplicate_groups.total_recoverable_bytes);
     api_buffer_append(&json, "  \"scan_status\": \"COMPLETED\"\n");
     api_buffer_append(&json, "}");
+
+    api_build_http_response(resp, 200, "OK", json.data, req->origin);
+    api_buffer_free(&json);
+}
+
+/* -------------------------------------------------------------------------
+ * PART 7A: Safe Quarantine & File Recovery REST Handlers
+ * ------------------------------------------------------------------------- */
+
+static bool parse_json_uint32(const char *json, const char *key, uint32_t *out_val) {
+    if (!json || !key || !out_val) return false;
+    char search_key[128];
+    snprintf(search_key, sizeof(search_key), "\"%s\"", key);
+    const char *pos = strstr(json, search_key);
+    if (!pos) return false;
+    const char *colon = strchr(pos, ':');
+    if (!colon) return false;
+    unsigned int val = 0;
+    if (sscanf(colon + 1, " %u", &val) == 1) {
+        *out_val = (uint32_t)val;
+        return true;
+    }
+    return false;
+}
+
+static bool parse_json_string(const char *json, const char *key, char *out_val, size_t max_len) {
+    if (!json || !key || !out_val || max_len == 0) return false;
+    out_val[0] = '\0';
+    char search_key[128];
+    snprintf(search_key, sizeof(search_key), "\"%s\"", key);
+    const char *pos = strstr(json, search_key);
+    if (!pos) return false;
+    const char *colon = strchr(pos, ':');
+    if (!colon) return false;
+    const char *quote1 = strchr(colon, '\"');
+    if (!quote1) return false;
+    quote1++;
+    size_t i = 0;
+    while (*quote1 && *quote1 != '\"' && i + 1 < max_len) {
+        if (*quote1 == '\\' && quote1[1] != '\0') {
+            quote1++;
+            if (*quote1 == '\\') out_val[i++] = '\\';
+            else if (*quote1 == '\"') out_val[i++] = '\"';
+            else if (*quote1 == '/') out_val[i++] = '/';
+            else out_val[i++] = *quote1;
+        } else {
+            out_val[i++] = *quote1;
+        }
+        quote1++;
+    }
+    out_val[i] = '\0';
+    return true;
+}
+
+static bool parse_json_uint64_array(const char *json, const char *key, uint64_t *out_arr, size_t max_items, size_t *out_count) {
+    if (!json || !key || !out_arr || !out_count || max_items == 0) return false;
+    *out_count = 0;
+    char search_key[128];
+    snprintf(search_key, sizeof(search_key), "\"%s\"", key);
+    const char *pos = strstr(json, search_key);
+    if (!pos) return false;
+    const char *open_b = strchr(pos, '[');
+    if (!open_b) return false;
+    const char *p = open_b + 1;
+    size_t cnt = 0;
+    while (*p && *p != ']') {
+        while (*p && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n' || *p == ',')) p++;
+        if (*p == ']') break;
+        char *endptr = NULL;
+        unsigned long long val = strtoull(p, &endptr, 10);
+        if (endptr && endptr != p) {
+            if (cnt < max_items) {
+                out_arr[cnt++] = (uint64_t)val;
+            }
+            p = endptr;
+        } else {
+            p++;
+        }
+    }
+    *out_count = cnt;
+    return true;
+}
+
+static void handle_quarantine_preview(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp) {
+    if (!req->body || req->body_length == 0) {
+        api_build_error_response(resp, 400, "Missing JSON request body in POST /api/quarantine/preview.", req->origin);
+        return;
+    }
+
+    uint32_t group_id = 0;
+    if (!parse_json_uint32(req->body, "group_id", &group_id)) {
+        api_build_error_response(resp, 400, "Missing or invalid 'group_id' property.", req->origin);
+        return;
+    }
+
+    uint64_t file_ids[32];
+    size_t file_count = 0;
+    if (!parse_json_uint64_array(req->body, "file_ids", file_ids, 32, &file_count) || file_count == 0) {
+        api_build_error_response(resp, 400, "Missing or empty 'file_ids' array property.", req->origin);
+        return;
+    }
+
+    QuarantinePreview prev;
+    StatusCode sc = quarantine_preview_create(&ctx->quarantine_mgr, &ctx->duplicate_groups, group_id, file_ids, file_count, &prev);
+    if (sc != STATUS_SUCCESS) {
+        if (sc == STATUS_ERROR_SOLE_COPY_REMAINING) {
+            api_build_error_response(resp, 400, "Safety violation: at least one original copy must remain (cannot quarantine all copies in group).", req->origin);
+            return;
+        }
+        api_build_error_response(resp, 400, status_to_string(sc), req->origin);
+        return;
+    }
+
+    ApiResponseBuffer json;
+    api_buffer_init(&json);
+    api_buffer_append(&json, "{\n");
+    api_buffer_append(&json, "  \"status\": \"success\",\n");
+    api_buffer_append_printf(&json, "  \"preview_id\": \"%s\",\n", prev.preview_id);
+    api_buffer_append_printf(&json, "  \"group_id\": %u,\n", prev.group_id);
+    api_buffer_append_printf(&json, "  \"file_count\": %zu,\n", prev.file_count);
+    api_buffer_append_printf(&json, "  \"remaining_copies\": %zu,\n", prev.remaining_copies);
+    api_buffer_append_printf(&json, "  \"estimated_recoverable_bytes\": %llu,\n", (unsigned long long)prev.estimated_recoverable_bytes);
+    api_buffer_append_printf(&json, "  \"expires_in_seconds\": %d,\n", QUARANTINE_PREVIEW_EXPIRY_SECONDS);
+    api_buffer_append(&json, "  \"confirmation_required\": \"QUARANTINE\",\n");
+    api_buffer_append(&json, "  \"files\": [\n");
+    for (size_t i = 0; i < prev.file_count; i++) {
+        api_buffer_append_printf(&json, "    {\"file_id\": %llu, \"file_size\": %llu, \"filepath\": ",
+                                 (unsigned long long)prev.file_ids[i], (unsigned long long)prev.file_sizes[i]);
+        api_buffer_append_escaped_json(&json, prev.file_paths[i]);
+        api_buffer_append_printf(&json, "}%s\n", (i + 1 < prev.file_count) ? "," : "");
+    }
+    api_buffer_append(&json, "  ]\n}");
+
+    api_build_http_response(resp, 200, "OK", json.data, req->origin);
+    api_buffer_free(&json);
+}
+
+static void handle_quarantine_execute(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp) {
+    if (!req->body || req->body_length == 0) {
+        api_build_error_response(resp, 400, "Missing JSON request body in POST /api/quarantine/execute.", req->origin);
+        return;
+    }
+
+    char preview_id[64] = {0};
+    if (!parse_json_string(req->body, "preview_id", preview_id, sizeof(preview_id)) || strlen(preview_id) == 0) {
+        api_build_error_response(resp, 400, "Missing or invalid 'preview_id' property.", req->origin);
+        return;
+    }
+
+    char confirmation[64] = {0};
+    parse_json_string(req->body, "confirmation", confirmation, sizeof(confirmation));
+    if (strcmp(confirmation, "QUARANTINE") != 0) {
+        api_build_error_response(resp, 400, "Explicit confirmation 'QUARANTINE' is required.", req->origin);
+        return;
+    }
+
+    size_t quarantined_count = 0;
+    char tx_ids[32][64];
+    StatusCode sc = quarantine_execute(&ctx->quarantine_mgr, &ctx->duplicate_groups, &ctx->inventory, preview_id, &quarantined_count, tx_ids);
+    if (sc != STATUS_SUCCESS) {
+        api_build_error_response(resp, 400, status_to_string(sc), req->origin);
+        return;
+    }
+
+    ApiResponseBuffer json;
+    api_buffer_init(&json);
+    api_buffer_append(&json, "{\n");
+    api_buffer_append(&json, "  \"status\": \"success\",\n");
+    api_buffer_append_printf(&json, "  \"quarantined_count\": %zu,\n", quarantined_count);
+    api_buffer_append(&json, "  \"transactions\": [\n");
+    for (size_t i = 0; i < quarantined_count; i++) {
+        api_buffer_append_printf(&json, "    \"%s\"%s\n", tx_ids[i], (i + 1 < quarantined_count) ? "," : "");
+    }
+    api_buffer_append(&json, "  ]\n}");
+
+    api_build_http_response(resp, 200, "OK", json.data, req->origin);
+    api_buffer_free(&json);
+}
+
+static void handle_quarantine_history(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp) {
+    const QuarantineManifest *m = &ctx->quarantine_mgr.manifest;
+
+    ApiResponseBuffer json;
+    api_buffer_init(&json);
+    api_buffer_append(&json, "{\n");
+    api_buffer_append(&json, "  \"status\": \"success\",\n");
+    api_buffer_append_printf(&json, "  \"total_records\": %zu,\n", m->count);
+    api_buffer_append(&json, "  \"records\": [\n");
+
+    for (size_t i = 0; i < m->count; i++) {
+        const QuarantineRecord *r = &m->records[i];
+        const char *st_str = (r->status == QUARANTINE_STATUS_ACTIVE) ? "ACTIVE" :
+                             (r->status == QUARANTINE_STATUS_RESTORED) ? "RESTORED" : "FAILED";
+
+        api_buffer_append(&json, "    {\n");
+        api_buffer_append_printf(&json, "      \"transaction_id\": \"%s\",\n", r->transaction_id);
+        api_buffer_append_printf(&json, "      \"group_id\": %u,\n", r->group_id);
+        api_buffer_append_printf(&json, "      \"file_record_id\": %llu,\n", (unsigned long long)r->file_record_id);
+        api_buffer_append(&json, "      \"original_path\": ");
+        api_buffer_append_escaped_json(&json, r->original_path);
+        api_buffer_append(&json, ",\n      \"quarantine_path\": ");
+        api_buffer_append_escaped_json(&json, r->quarantine_path);
+        api_buffer_append(&json, ",\n      \"original_filename\": ");
+        api_buffer_append_escaped_json(&json, r->original_filename);
+        api_buffer_append(&json, ",\n");
+        api_buffer_append_printf(&json, "      \"file_size\": %llu,\n", (unsigned long long)r->file_size);
+        api_buffer_append_printf(&json, "      \"sha256_hex\": \"%s\",\n", r->sha256_hex);
+        api_buffer_append_printf(&json, "      \"quarantine_timestamp\": %lld,\n", (long long)r->quarantine_timestamp);
+        api_buffer_append_printf(&json, "      \"restore_timestamp\": %lld,\n", (long long)r->restore_timestamp);
+        api_buffer_append_printf(&json, "      \"status\": \"%s\"\n", st_str);
+        api_buffer_append_printf(&json, "    }%s\n", (i + 1 < m->count) ? "," : "");
+    }
+    api_buffer_append(&json, "  ]\n}");
+
+    api_build_http_response(resp, 200, "OK", json.data, req->origin);
+    api_buffer_free(&json);
+}
+
+static void handle_quarantine_restore_preview(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp) {
+    if (!req->body || req->body_length == 0) {
+        api_build_error_response(resp, 400, "Missing JSON request body in POST /api/quarantine/restore/preview.", req->origin);
+        return;
+    }
+
+    char tx_id[64] = {0};
+    if (!parse_json_string(req->body, "transaction_id", tx_id, sizeof(tx_id)) || strlen(tx_id) == 0) {
+        api_build_error_response(resp, 400, "Missing or invalid 'transaction_id' property.", req->origin);
+        return;
+    }
+
+    QuarantinePreview prev;
+    StatusCode sc = quarantine_restore_preview(&ctx->quarantine_mgr, tx_id, &prev);
+    if (sc != STATUS_SUCCESS) {
+        if (sc == STATUS_ERROR_DESTINATION_EXISTS) {
+            api_build_error_response(resp, 409, "Destination file already exists at original location. Overwrite prevented.", req->origin);
+            return;
+        }
+        if (sc == STATUS_ERROR_FILE_TAMPERED) {
+            api_build_error_response(resp, 400, "Integrity check failed: quarantined file content does not match recorded SHA-256 digest.", req->origin);
+            return;
+        }
+        api_build_error_response(resp, 400, status_to_string(sc), req->origin);
+        return;
+    }
+
+    ApiResponseBuffer json;
+    api_buffer_init(&json);
+    api_buffer_append(&json, "{\n");
+    api_buffer_append(&json, "  \"status\": \"success\",\n");
+    api_buffer_append_printf(&json, "  \"preview_id\": \"%s\",\n", prev.preview_id);
+    api_buffer_append_printf(&json, "  \"transaction_id\": \"%s\",\n", prev.restore_transaction_id);
+    api_buffer_append(&json, "  \"original_path\": ");
+    api_buffer_append_escaped_json(&json, prev.file_paths[0]);
+    api_buffer_append(&json, ",\n");
+    api_buffer_append_printf(&json, "  \"file_size\": %llu,\n", (unsigned long long)prev.file_sizes[0]);
+    api_buffer_append_printf(&json, "  \"expires_in_seconds\": %d,\n", QUARANTINE_PREVIEW_EXPIRY_SECONDS);
+    api_buffer_append(&json, "  \"confirmation_required\": \"RESTORE\"\n");
+    api_buffer_append(&json, "}");
+
+    api_build_http_response(resp, 200, "OK", json.data, req->origin);
+    api_buffer_free(&json);
+}
+
+static void handle_quarantine_restore_execute(ApiEngineContext *ctx, const ApiHttpRequest *req, ApiResponseBuffer *resp) {
+    if (!req->body || req->body_length == 0) {
+        api_build_error_response(resp, 400, "Missing JSON request body in POST /api/quarantine/restore/execute.", req->origin);
+        return;
+    }
+
+    char preview_id[64] = {0};
+    if (!parse_json_string(req->body, "preview_id", preview_id, sizeof(preview_id)) || strlen(preview_id) == 0) {
+        api_build_error_response(resp, 400, "Missing or invalid 'preview_id' property.", req->origin);
+        return;
+    }
+
+    char confirmation[64] = {0};
+    parse_json_string(req->body, "confirmation", confirmation, sizeof(confirmation));
+    if (strcmp(confirmation, "RESTORE") != 0) {
+        api_build_error_response(resp, 400, "Explicit confirmation 'RESTORE' is required.", req->origin);
+        return;
+    }
+
+    char restored_path[1024] = {0};
+    StatusCode sc = quarantine_restore_execute(&ctx->quarantine_mgr, preview_id, restored_path, sizeof(restored_path));
+    if (sc != STATUS_SUCCESS) {
+        api_build_error_response(resp, 400, status_to_string(sc), req->origin);
+        return;
+    }
+
+    ApiResponseBuffer json;
+    api_buffer_init(&json);
+    api_buffer_append(&json, "{\n");
+    api_buffer_append(&json, "  \"status\": \"success\",\n");
+    api_buffer_append(&json, "  \"restored_path\": ");
+    api_buffer_append_escaped_json(&json, restored_path);
+    api_buffer_append(&json, "\n}");
 
     api_build_http_response(resp, 200, "OK", json.data, req->origin);
     api_buffer_free(&json);

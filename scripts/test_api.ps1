@@ -43,6 +43,8 @@ $ApiTestSources = @(
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/api/api_router.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/api/api_response.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/core/duplicate_detector.c"),
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/core/quarantine.c"),
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/core/quarantine_manifest.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/core/file_scanner.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/hashtable.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/duplicate_group.c"),

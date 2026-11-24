@@ -36,6 +36,12 @@ typedef enum {
     STATUS_ERROR_CONCURRENT_MODIFICATION = 302,
     STATUS_ERROR_QUARANTINE_FAILED  = 303,
     STATUS_ERROR_RESTORE_FAILED     = 304,
+    STATUS_ERROR_CROSS_VOLUME_MOVE  = 305,
+    STATUS_ERROR_PREVIEW_EXPIRED    = 306,
+    STATUS_ERROR_PREVIEW_NOT_FOUND  = 307,
+    STATUS_ERROR_FILE_TAMPERED      = 308,
+    STATUS_ERROR_DESTINATION_EXISTS = 309,
+    STATUS_ERROR_PREVIEW_ALREADY_USED = 310,
 
     /* Data Structure & Algorithmic Errors (400 to 499) */
     STATUS_ERROR_HT_COLLISION_LIMIT = 400,
@@ -84,6 +90,18 @@ static inline const char *status_to_string(StatusCode code) {
             return "Failed to relocate file to quarantine.";
         case STATUS_ERROR_RESTORE_FAILED:
             return "Failed to restore file from quarantine.";
+        case STATUS_ERROR_CROSS_VOLUME_MOVE:
+            return "Safety violation: cross-volume movement is forbidden.";
+        case STATUS_ERROR_PREVIEW_EXPIRED:
+            return "Quarantine preview token has expired.";
+        case STATUS_ERROR_PREVIEW_NOT_FOUND:
+            return "Quarantine preview token was not found.";
+        case STATUS_ERROR_FILE_TAMPERED:
+            return "Integrity violation: file content or hash has been tampered with.";
+        case STATUS_ERROR_DESTINATION_EXISTS:
+            return "Safety violation: destination file already exists; overwrite prevented.";
+        case STATUS_ERROR_PREVIEW_ALREADY_USED:
+            return "Quarantine preview token has already been used.";
         default:
             return "An unknown error occurred.";
     }

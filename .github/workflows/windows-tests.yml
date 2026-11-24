@@ -40,6 +40,8 @@ jobs:
             backend/src/core/engine.c \
             backend/src/core/file_scanner.c \
             backend/src/core/duplicate_detector.c \
+            backend/src/core/quarantine.c \
+            backend/src/core/quarantine_manifest.c \
             backend/src/ds/hashtable.c \
             backend/src/ds/duplicate_group.c \
             backend/src/ds/minheap.c \
@@ -118,6 +120,8 @@ jobs:
             backend/src/api/api_router.c \
             backend/src/api/api_response.c \
             backend/src/core/duplicate_detector.c \
+            backend/src/core/quarantine.c \
+            backend/src/core/quarantine_manifest.c \
             backend/src/core/file_scanner.c \
             backend/src/ds/hashtable.c \
             backend/src/ds/duplicate_group.c \
@@ -134,6 +138,31 @@ jobs:
         shell: msys2 {0}
         run: |
           ./backend/build/test_api.exe
+
+      - name: Compile Part 7A Safe Quarantine & Recovery Test Suite
+        shell: msys2 {0}
+        run: |
+          gcc -std=c11 -Wall -Wextra -Wpedantic \
+            -Ibackend/include \
+            backend/tests/test_quarantine.c \
+            backend/src/core/quarantine.c \
+            backend/src/core/quarantine_manifest.c \
+            backend/src/core/duplicate_detector.c \
+            backend/src/core/file_scanner.c \
+            backend/src/ds/hashtable.c \
+            backend/src/ds/duplicate_group.c \
+            backend/src/ds/minheap.c \
+            backend/src/platform/windows/win_file_scanner.c \
+            backend/src/platform/windows/win_crypto.c \
+            backend/src/platform/windows/win_file_compare.c \
+            -o backend/build/test_quarantine.exe \
+            -lbcrypt
+          ls -l backend/build/test_quarantine.exe
+
+      - name: Execute Part 7A 25-Scenario Quarantine & Recovery Test Suite
+        shell: msys2 {0}
+        run: |
+          ./backend/build/test_quarantine.exe
 
       - name: Smoke Test Main CLI
         shell: msys2 {0}

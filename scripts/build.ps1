@@ -20,6 +20,8 @@ $SrcFiles = @(
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/core/engine.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/core/file_scanner.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/core/duplicate_detector.c"),
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/core/quarantine.c"),
+    [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/core/quarantine_manifest.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/hashtable.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/duplicate_group.c"),
     [System.IO.Path]::GetFullPath("$WorkspaceRoot/backend/src/ds/minheap.c"),

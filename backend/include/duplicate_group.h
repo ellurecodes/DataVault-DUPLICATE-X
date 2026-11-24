@@ -72,6 +72,14 @@ StatusCode duplicate_group_add_file(DuplicateGroup *group, const FileRecord *fil
 void duplicate_group_free(DuplicateGroup *group);
 
 /**
+ * @brief Remove a file record from a DuplicateGroup by record ID and update recoverable bytes.
+ * @param group Pointer to DuplicateGroup.
+ * @param file_record_id ID of FileRecord to remove.
+ * @return True if found and removed, false otherwise.
+ */
+bool duplicate_group_remove_file(DuplicateGroup *group, uint64_t file_record_id);
+
+/**
  * @brief Initialize an empty DuplicateGroupList.
  * @param list Pointer to DuplicateGroupList.
  */

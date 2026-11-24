@@ -211,3 +211,4 @@ The test suite in `backend/tests/test_api.c` was expanded to **18 comprehensive 
 *Answer:* DUPLICATE-X employs a rigorous two-tier verification pipeline:
 1. Files must have matching sizes and identical cryptographic SHA-256 hashes generated via Windows BCrypt.
 2. Even with identical SHA-256 hashes, the engine performs byte-by-byte comparison (`win_file_compare.c`) using 64 KB buffered reads. Only when every single byte matches is a duplicate confirmed, ensuring 100% mathematical certainty with zero false positives.
+

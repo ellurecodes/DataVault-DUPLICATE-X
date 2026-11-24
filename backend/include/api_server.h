@@ -12,6 +12,7 @@
 #include "file_scanner.h"
 #include "trie.h"
 #include "minheap.h"
+#include "quarantine.h"
 #include "api_response.h"
 #include "status.h"
 #include <winsock2.h>
@@ -37,6 +38,7 @@ typedef struct {
     size_t successfully_hashed;         /**< Count of successfully hashed files */
     char last_scan_status[64];          /**< Status description ("IDLE", "COMPLETED", "ERROR") */
     bool has_completed_scan;            /**< True if at least one scan has run */
+    QuarantineManager quarantine_mgr;   /**< Quarantine and recovery subsystem */
 } ApiEngineContext;
 
 /**

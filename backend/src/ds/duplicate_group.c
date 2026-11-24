@@ -77,6 +77,35 @@ void duplicate_group_free(DuplicateGroup *group) {
     free(group);
 }
 
+bool duplicate_group_remove_file(DuplicateGroup *group, uint64_t file_record_id) {
+    if (!group || !group->files_head) return false;
+
+    FileNode *prev = NULL;
+    FileNode *curr = group->files_head;
+
+    while (curr) {
+        if (curr->record && curr->record->record_id == file_record_id) {
+            if (prev) {
+                prev->next = curr->next;
+            } else {
+                group->files_head = curr->next;
+            }
+
+            if (curr == group->files_tail) {
+                group->files_tail = prev;
+            }
+
+            free(curr);
+            if (group->file_count > 0) group->file_count--;
+            group->recoverable_bytes = (group->file_count > 1) ? (uint64_t)(group->file_count - 1) * group->file_size : 0;
+            return true;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+    return false;
+}
+
 void duplicate_group_list_init(DuplicateGroupList *list) {
     if (!list) return;
     list->head = NULL;
